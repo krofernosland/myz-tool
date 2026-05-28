@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MYZ Combat — Multijoueur</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.30.0/tabler-icons.min.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;font-family:sans-serif}
+
+/* ── Lobby overlay ─────────────────────────────────────────────── */
+#lobby{
+  position:fixed;inset:0;background:#0d0b08;
+  display:flex;align-items:center;justify-content:center;
+  z-index:999;
+}
+#lobby-box{
+  background:#111009;border:1px solid #3a3530;border-radius:12px;
+  padding:32px 36px;width:360px;display:flex;flex-direction:column;gap:14px;
+}
+#lobby-box h1{font-size:18px;color:#ffd875;letter-spacing:2px;text-align:center;font-weight:600}
+#lobby-box p{font-size:11px;color:#5a5040;text-align:center;line-height:1.5}
+.lby-input{
+  background:#2a2520;border:1px solid #3a3530;border-radius:6px;
+  color:#c4b89a;font-size:14px;padding:9px 12px;width:100%;outline:none;letter-spacing:1px;
+}
+.lby-input:focus{border-color:#c49a1a}
+.lby-input::placeholder{color:#3a3530;letter-spacing:0}
+.lby-btn{
+  background:#5a3e0a;border:1px solid #c49a1a;border-radius:6px;
+  color:#ffd875;font-size:13px;padding:9px;cursor:pointer;
+  width:100%;font-weight:600;transition:background .15s;
+}
+.lby-btn:hover{background:#7a5410}
+.lby-btn.sec{background:#2a2520;border-color:#3a3530;color:#c4b89a;}
+.lby-btn.sec:hover{background:#3a3530}
+.lby-sep{display:flex;align-items:center;gap:8px;color:#3a3530;font-size:11px}
+.lby-sep::before,.lby-sep::after{content:'';flex:1;height:1px;background:#2a2520}
+#lobby-status{font-size:11px;color:#e8a030;text-align:center;min-height:16px}
+
+/* ── Presence bar ───────────────────────────────────────────────── */
+#presence-bar{
+  position:absolute;top:4px;right:8px;display:flex;align-items:center;
+  gap:5px;z-index:20;
+}
+.presence-dot{
+  width:22px;height:22px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;font-weight:700;color:#111;
+  border:2px solid rgba(255,255,255,.15);
+  cursor:default;
+}
+#room-badge{
+  background:#1a1a10;border:1px solid #5a5040;border-radius:4px;
+  color:#ffffff;font-size:13px;font-weight:600;padding:4px 10px;letter-spacing:2px;cursor:pointer;
+}
+#room-badge:hover{color:#ffd875;border-color:#c49a1a}
+
+/* ── App shell ─────────────────────────────────────────────────── */
+#app{display:flex;width:100%;height:100vh;background:#1a1714;overflow:hidden}
+#sidebar{width:310px;min-width:310px;background:#111009;border-right:1px solid #3a3530;display:flex;flex-direction:column;padding:10px;gap:6px;overflow-y:auto}
+#init-bar{position:absolute;top:0;left:0;right:0;height:52px;background:#0d0b08ee;border-bottom:1px solid #3a3530;display:flex;align-items:center;gap:6px;padding:0 10px;z-index:10;overflow-x:auto;overflow-y:hidden}
+#init-bar::-webkit-scrollbar{height:3px}
+#init-bar::-webkit-scrollbar-thumb{background:#3a3530;border-radius:2px}
+#tour-badge{flex-shrink:0;margin-left:auto;background:#2a1e00;border:1px solid #5a4a20;border-radius:6px;padding:3px 10px;display:flex;flex-direction:column;align-items:center;gap:0;min-width:48px}
+#tour-badge-label{font-size:8px;color:#5a5040;letter-spacing:1px;text-transform:uppercase}
+#tour-badge-num{font-size:16px;font-weight:800;color:#ffd875;line-height:1.1}
+.ibar-slot{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:52px;padding:4px 6px;border-radius:6px;border:1px solid transparent;cursor:pointer;flex-shrink:0;transition:background .15s}
+.ibar-slot.active{background:#2a1e00;border-color:#ffd875}
+.ibar-slot.played{opacity:.38}
+.ibar-dot{width:18px;height:18px;border-radius:50%;flex-shrink:0}
+.ibar-dot.sq{border-radius:3px}
+.ibar-dot.star{clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.ibar-name{font-size:9px;color:#8a7f6e;max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ibar-score{font-size:11px;font-weight:700;color:#ffd875}
+.ibar-slot.active .ibar-name{color:#ffd875}
+.ibar-sep{width:1px;height:30px;background:#2a2520;flex-shrink:0;margin:0 2px}
+#canvas-wrap{flex:1;position:relative;overflow:hidden}
+#canvas{display:block;margin-top:52px}
+.pion-roll-btn{background:#1a1714;border:1px solid #3a3530;border-radius:3px;color:#8a7f6e;font-size:9px;padding:1px 4px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.pion-roll-btn:hover{background:#2a2520;color:#c4b89a}
+.pion-adj{background:none;border:none;color:#5a5040;cursor:pointer;font-size:13px;padding:0 1px;line-height:1;flex-shrink:0}
+.pion-adj:hover{color:#ffd875}
+.tour-banner{font-size:10px;font-weight:600;color:#e8a030;text-align:center;padding:3px 6px;background:#2a1500;border-radius:4px;border:1px solid #5a3000;letter-spacing:.5px}
+.sb-title{font-size:10px;font-weight:500;color:#8a7f6e;text-transform:uppercase;letter-spacing:1px;padding:4px 0 2px;border-bottom:1px solid #2a2520;flex-shrink:0}
+.tool-btn{background:#2a2520;border:1px solid #3a3530;border-radius:6px;color:#c4b89a;font-size:12px;padding:5px 8px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:6px;transition:background .15s;flex-shrink:0}
+.tool-btn:hover{background:#3a3530}
+.tool-btn.active{background:#8b6914;border-color:#c49a1a;color:#ffd875}
+.tool-btn i{font-size:14px}
+.pion-item{background:#2a2520;border:1px solid #3a3530;border-radius:6px;padding:4px 7px;font-size:12px;color:#c4b89a;display:flex;align-items:center;gap:6px;cursor:pointer;transition:background .15s}
+.pion-item:hover{background:#3a3530}
+.pion-item.selected{border-color:#c49a1a;background:#221e10}
+.pion-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.pion-dot.sq{border-radius:2px}
+.mini-input{background:#2a2520;border:1px solid #3a3530;border-radius:5px;color:#c4b89a;font-size:12px;padding:4px 7px;width:100%;outline:none}
+.mini-input:focus{border-color:#c49a1a}
+.mini-select{background:#2a2520;border:1px solid #3a3530;border-radius:5px;color:#c4b89a;font-size:12px;padding:4px 7px;outline:none;width:100%}
+.color-swatch{width:16px;height:16px;border-radius:50%;cursor:pointer;border:2px solid transparent;flex-shrink:0}
+.color-swatch.sel{border-color:#ffd875}
+.dist-panel{background:#0d0c09;border-radius:6px;padding:7px;font-size:11px;color:#8a7f6e}
+.dist-row{display:flex;justify-content:space-between;align-items:center;padding:2px 0;border-bottom:1px solid #1e1c18;cursor:pointer}
+.dist-row:last-child{border-bottom:none}
+.dist-row:hover{background:#15130f}
+.zone-card{background:#0d0c09;border-radius:6px;padding:8px;font-size:11px;display:none;border-left:3px solid #3a3530}
+.zone-card.visible{display:block}
+.zone-card-title{font-weight:500;font-size:12px;margin-bottom:6px}
+.zone-desc{color:#8a7f6e;font-size:10px;margin-bottom:5px;line-height:1.4}
+.mod-table{width:100%;border-collapse:collapse}
+.mod-table td{padding:2px 4px;font-size:10px}
+.mod-table td:last-child{text-align:right;font-weight:500}
+.mod-table tr{border-bottom:1px solid #1e1c18}
+.mod-table tr:last-child{border-bottom:none}
+.pos{color:#4fc97a}.neg{color:#e04040}.neu{color:#c4b89a}.auto{color:#60b0ff}.warn{color:#e8a030}
+.scene-item{background:#2a2520;border:1px solid #3a3530;border-radius:5px;padding:4px 7px;font-size:11px;color:#c4b89a;display:flex;justify-content:space-between;align-items:center;gap:4px}
+.scene-item button{background:none;border:none;color:#5a5040;cursor:pointer;font-size:11px;padding:0 2px}
+.scene-item button:hover{color:#e04040}
+.init-row{background:#0d0c09;border-radius:6px;padding:5px 7px;display:flex;align-items:center;gap:6px;border-left:3px solid transparent;transition:border-color .2s}
+.init-row.active-turn{border-left-color:#ffd875;background:#181510}
+.init-rank{font-size:13px;font-weight:700;color:#ffd875;width:16px;text-align:center;flex-shrink:0}
+.init-name{flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.init-score-input{background:#2a2520;border:1px solid #3a3530;border-radius:4px;color:#ffd875;font-size:12px;font-weight:600;width:38px;text-align:center;padding:2px 4px;outline:none}
+.init-score-input:focus{border-color:#c49a1a}
+.init-btn{background:none;border:none;color:#5a5040;cursor:pointer;font-size:13px;padding:0 2px;line-height:1}
+.init-btn:hover{color:#c4b89a}
+.init-turn-indicator{font-size:10px;color:#ffd875;font-weight:500;text-align:center;padding:3px;background:#2a1a00;border-radius:4px;border:1px solid #5a4a20}
+.pion-init::-webkit-inner-spin-button,.pion-init::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.pion-init{background:#1a1714;border:1px solid #3a3530;border-radius:4px;color:#ffd875;font-size:11px;font-weight:600;width:34px;text-align:center;padding:2px 3px;outline:none;flex-shrink:0;-moz-appearance:textfield;appearance:textfield}
+.pion-init:focus{border-color:#c49a1a}
+.pion-rank{font-size:10px;font-weight:700;color:#5a5040;width:13px;text-align:center;flex-shrink:0}
+.pion-rank.top{color:#ffd875}
+.expl-panel{background:#0d0c09;border-radius:6px;padding:8px;font-size:11px}
+.expl-step{background:#2a2520;border:1px solid #3a3530;border-radius:4px;color:#c4b89a;width:22px;height:22px;cursor:pointer;font-size:14px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.expl-step:hover{background:#3a3530}
+.expl-zone-row{display:flex;justify-content:space-between;align-items:center;padding:3px 5px;border-radius:4px;font-size:11px}
+.expl-res-row{display:flex;justify-content:space-between;align-items:center;padding:3px 6px;border-radius:4px;margin-bottom:2px;font-size:11px}
+.die-pip{display:inline-block;width:14px;height:14px;border-radius:3px;background:#2a2520;border:1px solid #4a4030;text-align:center;line-height:14px;font-size:10px;margin:1px}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#4fc97a;display:inline-block;margin-left:4px;flex-shrink:0}
+.sync-dot.off{background:#e04040}
+.sync-dot.wait{background:#e8a030}
+/* ── New turn banner ────────────────────────────────────────────── */
+#new-turn-banner{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);
+  z-index:10000;pointer-events:none;
+  display:none;flex-direction:column;align-items:center;gap:6px;
+  animation:turnPop .5s cubic-bezier(.2,.8,.3,1) forwards;
+}
+@keyframes turnPop{
+  0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}
+  40%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}
+  70%{transform:translate(-50%,-50%) scale(.97)}
+  100%{opacity:1;transform:translate(-50%,-50%) scale(1)}
+}
+#new-turn-banner.fade-out{animation:turnFade .6s ease forwards}
+@keyframes turnFade{to{opacity:0;transform:translate(-50%,-50%) scale(1.05)}}
+.ntb-label{font-size:13px;color:#8a7f6e;letter-spacing:3px;text-transform:uppercase;font-weight:600}
+.ntb-number{font-size:72px;font-weight:900;color:#ffd875;line-height:1;text-shadow:0 0 40px rgba(196,154,26,.6),0 2px 8px rgba(0,0,0,.8)}
+.ntb-sub{font-size:14px;color:#c4b89a;letter-spacing:2px;text-transform:uppercase}
+#dice-overlay{
+  position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+  z-index:9999;display:none;
+  animation:slideUp .3s cubic-bezier(.2,.8,.3,1);
+  pointer-events:none;
+}
+@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(24px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+#dice-overlay-inner{
+  background:#161310ee;border:1px solid #4a4030;border-radius:12px;
+  padding:12px 18px;max-width:720px;min-width:320px;
+  display:flex;flex-direction:column;gap:10px;
+  box-shadow:0 4px 32px rgba(0,0,0,.8);
+  backdrop-filter:blur(6px);
+  pointer-events:all;
+}
+.ov-title{font-size:10px;color:#5a5040;letter-spacing:.5px;text-transform:uppercase}
+.ov-who{font-size:13px;font-weight:700;color:#ffd875}
+.ov-dice-wrap{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-start;min-height:40px}
+.ov-die{width:36px;height:36px;border-radius:7px;display:flex;align-items:center;justify-content:center;position:relative;flex-shrink:0}
+.ov-die.rolling{animation:rollAnim .45s ease}
+@keyframes rollAnim{
+  0%{transform:rotate(-18deg) scale(.75);opacity:.3}
+  35%{transform:rotate(10deg) scale(1.1);opacity:1}
+  65%{transform:rotate(-5deg) scale(.97)}
+  100%{transform:rotate(0deg) scale(1)}
+}
+.ov-die.locked-one{opacity:.35;outline:2px solid #5a5040;outline-offset:2px;border-radius:7px}
+.ov-summary{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.ov-stat{display:flex;align-items:center;gap:5px}
+.ov-stat-val{font-size:20px;font-weight:800;line-height:1}
+.ov-stat-label{font-size:10px;color:#5a5040;letter-spacing:.3px}
+.ov-push-btn{background:#2a1500;border:1px solid #7a4000;border-radius:6px;color:#e8a030;font-size:12px;font-weight:700;padding:6px 18px;cursor:pointer;transition:background .15s;white-space:nowrap}
+.ov-push-btn:hover{background:#3a2000}
+.ov-close-btn{background:none;border:none;color:#5a5040;font-size:16px;cursor:pointer;padding:0 4px;line-height:1;margin-left:auto;flex-shrink:0}
+.ov-close-btn:hover{color:#c4b89a}
+.ov-push-badge{display:inline-block;background:#3a0000;color:#e04040;border-radius:3px;font-size:9px;padding:1px 5px;font-weight:700;margin-left:6px}
+/* ── Dice history ───────────────────────────────────────────────── */
+.dice-hist-item{background:#0d0c09;border-radius:5px;padding:6px 8px;font-size:10px;border-left:2px solid #2a2520;display:flex;flex-direction:column;gap:4px}
+.dice-hist-header{display:flex;align-items:center;gap:6px}
+.dice-hist-name{font-weight:700;font-size:11px}
+.dice-hist-pushed{background:#3a1500;color:#e8a030;border-radius:3px;font-size:9px;padding:1px 5px;font-weight:700}
+.dice-hist-dice{display:flex;flex-wrap:wrap;gap:3px}
+.dice-hist-result{font-size:11px;font-weight:700}
+/* ── Dice roller panel ──────────────────────────────────────────── */
+#dice-panel{width:260px;min-width:260px;background:#111009;border-left:1px solid #3a3530;display:flex;flex-direction:column;padding:10px;gap:7px;overflow-y:auto}
+.dice-type-row{display:flex;align-items:center;gap:6px}
+.dice-type-label{font-size:11px;flex:1;color:#8a7f6e}
+.dice-count-btn{background:#2a2520;border:1px solid #3a3530;border-radius:4px;color:#c4b89a;width:22px;height:22px;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.dice-count-btn:hover{background:#3a3530;color:#ffd875}
+.dice-count-val{font-size:13px;font-weight:700;min-width:18px;text-align:center;color:#ffd875}
+.dice-face{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:5px;font-size:13px;font-weight:700;border:2px solid rgba(0,0,0,.3);flex-shrink:0;position:relative;cursor:default;user-select:none}
+.dice-face.locked{opacity:.45;outline:2px solid #5a5040}
+.dice-face.kept-six{box-shadow:0 0 6px 2px currentColor}
+.dice-face svg{width:14px;height:14px;pointer-events:none}
+.dice-results-wrap{display:flex;flex-wrap:wrap;gap:4px;min-height:32px;background:#0d0c09;border-radius:6px;padding:6px}
+.result-summary{background:#0d0c09;border-radius:6px;padding:7px 9px;font-size:11px;display:flex;flex-direction:column;gap:3px}
+.result-line{display:flex;justify-content:space-between;align-items:center}
+.result-val{font-weight:700}
+.push-btn{background:#2a1500;border:1px solid #7a4000;border-radius:6px;color:#e8a030;font-size:12px;font-weight:600;padding:7px;cursor:pointer;text-align:center;transition:background .15s;width:100%}
+.push-btn:hover{background:#3a2000}
+.push-btn:disabled{opacity:.3;cursor:default}
+.roll-btn{background:#3a2e00;border:1px solid #c49a1a;border-radius:6px;color:#ffd875;font-size:13px;font-weight:700;padding:9px;cursor:pointer;text-align:center;transition:background .15s;width:100%;letter-spacing:.5px}
+.roll-btn:hover{background:#5a4800}
+.dice-hist-item{background:#0d0c09;border-radius:5px;padding:5px 7px;font-size:10px;color:#5a5040;border-left:2px solid #2a2520}
+.dice-hist-item .hist-name{color:#8a7f6e;font-weight:600}
+.dice-hist-item .hist-res{color:#ffd875}
+#role-screen{
+  position:fixed;inset:0;background:#0d0b08;
+  display:none;align-items:center;justify-content:center;
+  z-index:998;
+}
+#role-box{
+  background:#111009;border:1px solid #3a3530;border-radius:12px;
+  padding:32px 36px;width:420px;display:flex;flex-direction:column;gap:16px;
+}
+#role-box h2{font-size:16px;color:#ffd875;letter-spacing:2px;text-align:center;font-weight:600}
+#role-box p{font-size:11px;color:#5a5040;text-align:center;line-height:1.5}
+.role-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.role-card{
+  background:#1a1714;border:2px solid #3a3530;border-radius:10px;
+  padding:20px 12px;cursor:pointer;text-align:center;
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  transition:border-color .15s,background .15s;
+}
+.role-card:hover{background:#22201a;border-color:#c49a1a}
+.role-card.sel{background:#2a1e00;border-color:#ffd875}
+.role-card-icon{font-size:28px}
+.role-card-title{font-size:14px;font-weight:700;color:#ffd875;letter-spacing:1px}
+.role-card-desc{font-size:10px;color:#5a5040;line-height:1.5}
+#role-pion-select{display:none;flex-direction:column;gap:8px}
+#role-pion-select label{font-size:11px;color:#8a7f6e}
+#role-pion-list{display:flex;flex-wrap:wrap;gap:6px}
+.rpion-btn{
+  background:#2a2520;border:1px solid #3a3530;border-radius:6px;
+  color:#c4b89a;font-size:12px;padding:5px 10px;cursor:pointer;
+  display:flex;align-items:center;gap:5px;transition:border-color .15s;
+}
+.rpion-btn:hover{border-color:#c49a1a}
+.rpion-btn.sel{border-color:#ffd875;background:#2a1e00;color:#ffd875}
+#role-confirm{display:none}
+.role-badge{
+  position:fixed;top:6px;left:8px;z-index:25;
+  background:#1a1714;border:1px solid #3a3530;border-radius:4px;
+  font-size:10px;color:#8a7f6e;padding:3px 7px;pointer-events:none;letter-spacing:.5px;
+}
+.gm-only{ display:contents; } /* shown by default — applyRoleUI hides for players */
+
+</style>
+</head>
+<body>
+
+<!-- ── LOBBY ───────────────────────────────────────────────────── -->
+<div id="lobby">
+  <div id="lobby-box">
+    <h1>☢ MYZ COMBAT</h1>
+    <p>Créez une salle ou rejoignez une partie existante avec un code.</p>
+
+    <div>
+      <input class="lby-input" id="lby-pseudo" placeholder="Votre nom (ex: MJ, Hulk…)" maxlength="16" style="margin-bottom:8px">
+      <button class="lby-btn" onclick="createRoom()">✦ Créer une nouvelle salle</button>
+    </div>
+
+    <div class="lby-sep">ou rejoindre</div>
+
+    <div style="display:flex;gap:6px">
+      <input class="lby-input" id="lby-code" placeholder="Code de salle (ex: WOLF-42)" maxlength="12" style="text-transform:uppercase;letter-spacing:2px">
+      <button class="lby-btn sec" onclick="joinRoom()" style="width:auto;padding:9px 14px;flex-shrink:0">→</button>
+    </div>
+
+    <div id="lobby-status"></div>
+  </div>
+</div>
+
+<!-- ── ROLE SCREEN ──────────────────────────────────────────────── -->
+<div id="role-screen">
+  <div id="role-box">
+    <h2>☢ CHOISIR UN RÔLE</h2>
+    <p>Connecté en tant que <strong id="role-pseudo-display" style="color:#c4b89a"></strong></p>
+
+    <div class="role-cards">
+      <div class="role-card" id="rc-gm" onclick="selectRole('gm')">
+        <div class="role-card-icon">🎲</div>
+        <div class="role-card-title">MAÎTRE DU JEU</div>
+        <div class="role-card-desc">Accès complet à tous les outils : pions, dessin, explosions, scènes, fond de carte.</div>
+      </div>
+      <div class="role-card" id="rc-player" onclick="selectRole('player')">
+        <div class="role-card-icon">⚔️</div>
+        <div class="role-card-title">JOUEUR</div>
+        <div class="role-card-desc">Déplace ton pion, mesure les distances. Le MJ gère le reste.</div>
+      </div>
+    </div>
+
+    <div id="role-pion-select" style="display:none;flex-direction:column;gap:10px">
+
+      <!-- Créer son pion -->
+      <div style="background:#1a1714;border:1px solid #3a3530;border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px">
+        <div style="font-size:11px;color:#8a7f6e;font-weight:600;letter-spacing:.5px">✦ CRÉER MON PION</div>
+        <input class="lby-input" id="role-new-name" placeholder="Nom du personnage…" maxlength="12" style="font-size:13px;padding:7px 10px">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <div class="color-swatch sel" style="background:#4fc97a;width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent" data-c="#4fc97a" onclick="rolePickColor(this)"></div>
+          <div class="color-swatch" style="background:#60b0ff;width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent" data-c="#60b0ff" onclick="rolePickColor(this)"></div>
+          <div class="color-swatch" style="background:#e04040;width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent" data-c="#e04040" onclick="rolePickColor(this)"></div>
+          <div class="color-swatch" style="background:#e8a030;width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent" data-c="#e8a030" onclick="rolePickColor(this)"></div>
+          <div class="color-swatch" style="background:#c060e0;width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent" data-c="#c060e0" onclick="rolePickColor(this)"></div>
+          <div class="color-swatch" style="background:#e060a0;width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent" data-c="#e060a0" onclick="rolePickColor(this)"></div>
+          <div class="color-swatch" style="background:#ffd875;width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid transparent" data-c="#ffd875" onclick="rolePickColor(this)"></div>
+        </div>
+        <button class="lby-btn" onclick="createAndSelectPion()" style="padding:7px">Créer ce pion →</button>
+      </div>
+
+      <!-- Ou choisir un existant -->
+      <div id="role-pion-existing" style="display:flex;flex-direction:column;gap:6px">
+        <div style="font-size:11px;color:#5a5040;letter-spacing:.5px">— ou choisir un pion existant —</div>
+        <div id="role-pion-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+
+      <p id="role-pion-hint" style="font-size:10px;color:#5a5040;line-height:1.4"></p>
+    </div>
+
+    <button class="lby-btn" id="role-confirm" onclick="confirmRole()">Entrer dans la salle →</button>
+    <div id="role-status" style="font-size:11px;color:#e8a030;text-align:center;min-height:14px"></div>
+  </div>
+</div>
+
+<!-- ── APP ─────────────────────────────────────────────────────── -->
+<div id="app" style="display:none">
+  <div id="sidebar">
+    <div class="sb-title">Outil <span class="sync-dot wait" id="sync-dot" title="Connexion…"></span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+      <button class="tool-btn active" id="btn-select" onclick="setTool('select')"><i class="ti ti-cursor-text"></i> Sélect./Dépl.</button>
+      <button class="tool-btn" id="btn-mesure" onclick="setTool('mesure')"><i class="ti ti-ruler"></i> Mesurer</button>
+      <button class="tool-btn" id="btn-draw" onclick="setTool('draw')"><i class="ti ti-pencil"></i> Dessiner</button>
+      <button class="tool-btn" id="btn-erase" onclick="setTool('erase')"><i class="ti ti-eraser"></i> Effacer</button>
+      <button class="tool-btn" id="btn-bg" onclick="setTool('bg')"><i class="ti ti-photo"></i> Fond</button>
+      <button class="tool-btn gm-only" id="btn-fog" onclick="setTool('fog')" style="grid-column:span 2;justify-content:center"><i class="ti ti-weather-fog"></i> Brouillard de guerre</button>
+    </div>
+
+    <div class="sb-title">Protagonistes &amp; Initiative</div>
+    <div class="gm-only" style="display:contents">
+    <div style="display:flex;gap:4px">
+      <input class="mini-input" id="new-name" placeholder="Nom..." maxlength="12" style="flex:1;min-width:0">
+      <input class="mini-input" id="new-init" type="number" placeholder="Init" min="-99" max="99" style="width:44px;text-align:center;flex-shrink:0">
+    </div>
+    <div style="display:flex;gap:4px;align-items:center">
+      <select class="mini-select" id="new-shape" style="flex:1;min-width:0">
+        <option value="circle">● PJ</option>
+        <option value="square">■ PNJ</option>
+        <option value="star">★ Créature</option>
+      </select>
+      <div style="display:flex;gap:3px;flex-wrap:wrap;flex-shrink:0">
+        <div class="color-swatch sel" style="background:#4fc97a" data-c="#4fc97a" onclick="pickColor(this)"></div>
+        <div class="color-swatch" style="background:#60b0ff" data-c="#60b0ff" onclick="pickColor(this)"></div>
+        <div class="color-swatch" style="background:#e04040" data-c="#e04040" onclick="pickColor(this)"></div>
+        <div class="color-swatch" style="background:#e8a030" data-c="#e8a030" onclick="pickColor(this)"></div>
+        <div class="color-swatch" style="background:#c060e0" data-c="#c060e0" onclick="pickColor(this)"></div>
+        <div class="color-swatch" style="background:#e060a0" data-c="#e060a0" onclick="pickColor(this)"></div>
+        <div class="color-swatch" style="background:#f0f0e0" data-c="#f0f0e0" onclick="pickColor(this)"></div>
+      </div>
+    </div>
+    <button class="tool-btn" onclick="addPion()" style="justify-content:center"><i class="ti ti-plus"></i> Ajouter</button>
+    </div><!-- /gm-only add form -->
+
+    <div id="init-turn-display" style="display:none" class="init-turn-indicator"></div>
+    <div id="tour-counter" style="display:none" class="tour-banner"></div>
+    <div id="pion-list" style="display:flex;flex-direction:column;gap:3px"></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+      <button class="tool-btn" onclick="prevTurn()" style="justify-content:center;font-size:11px"><i class="ti ti-chevron-left"></i> Préc.</button>
+      <button class="tool-btn" onclick="nextTurn()" style="justify-content:center;font-size:11px">Suiv. <i class="ti ti-chevron-right"></i></button>
+    </div>
+
+    <div class="sb-title">Distances</div>
+    <div class="gm-only">
+    <div style="display:flex;align-items:center;gap:5px">
+      <span style="font-size:10px;color:#8a7f6e;flex:1">Taille des zones</span>
+      <span id="zone-scale-label" style="font-size:11px;color:#ffd875;min-width:36px;text-align:right">100%</span>
+    </div>
+    <input type="range" id="zone-scale-range" min="20" max="300" value="100" step="5"
+      oninput="setZoneScale(this.value/100)"
+      style="width:100%;accent-color:#c49a1a;cursor:pointer">
+    </div><!-- /gm-only zone scale -->
+    <div style="display:flex;align-items:center;gap:5px">
+      <span style="font-size:10px;color:#8a7f6e;flex:1">Opacité des cercles</span>
+      <span id="zone-opacity-label" style="font-size:11px;color:#ffd875;min-width:36px;text-align:right">50%</span>
+    </div>
+    <input type="range" id="zone-opacity-range" min="0" max="100" value="50" step="5"
+      oninput="setZoneOpacity(this.value/100)"
+      style="width:100%;accent-color:#c49a1a;cursor:pointer">
+    <div class="dist-panel" id="dist-panel"><span style="color:#5a5040">Sélectionne un pion</span></div>
+    <div class="zone-card" id="zone-card">
+      <div class="zone-card-title" id="zc-title"></div>
+      <div class="zone-desc" id="zc-desc"></div>
+      <table class="mod-table" id="zc-mods"></table>
+      <div class="note" id="zc-note"></div>
+    </div>
+
+    <div class="gm-only">
+    <div class="sb-title">Explosions</div>
+    <div class="expl-panel">
+      <div style="display:flex;gap:5px;align-items:center;margin-bottom:6px">
+        <span style="font-size:11px;color:#8a7f6e;flex:1">Blast Power</span>
+        <button class="expl-step" onclick="changeBlast(-1)">−</button>
+        <span id="blast-val" style="font-size:14px;font-weight:700;color:#e8a030;min-width:20px;text-align:center">4</span>
+        <button class="expl-step" onclick="changeBlast(1)">+</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#8a7f6e;cursor:pointer;margin-bottom:7px">
+        <input type="checkbox" id="shrapnel-chk" onchange="renderExplZones()" style="accent-color:#e8a030">
+        Shrapnel (Blast Power +2, dégâts +1)
+      </label>
+      <div id="expl-zones" style="display:flex;flex-direction:column;gap:3px;margin-bottom:7px"></div>
+      <button class="tool-btn" onclick="rollExplosion()" style="justify-content:center;width:100%;background:#3a1a00;border-color:#7a4000;color:#e8a030">
+        <i class="ti ti-flame"></i> Lancer l'explosion
+      </button>
+      <div id="expl-result" style="display:none;margin-top:6px"></div>
+    </div>
+
+    <div class="sb-title">Fond de carte</div>
+    <label style="display:flex;align-items:center;gap:6px;background:#2a2520;border:1px solid #3a3530;border-radius:6px;color:#c4b89a;font-size:12px;padding:5px 8px;cursor:pointer">
+      <i class="ti ti-upload" style="font-size:14px"></i> Importer image
+      <input type="file" accept="image/*" style="display:none" id="bg-file">
+    </label>
+    <div id="bg-controls" style="display:none;flex-direction:column;gap:5px">
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:10px;color:#8a7f6e;flex:1">Échelle</span>
+        <span id="bg-scale-label" style="font-size:11px;color:#ffd875;min-width:36px;text-align:right">100%</span>
+      </div>
+      <input type="range" id="bg-scale-range" min="10" max="400" value="100" step="1"
+        oninput="onBgScale(this.value)"
+        style="width:100%;accent-color:#c49a1a;cursor:pointer">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px">
+        <button class="tool-btn" onclick="bgPreset('cover')"   style="justify-content:center;font-size:10px;padding:3px 4px">Cover</button>
+        <button class="tool-btn" onclick="bgPreset('contain')" style="justify-content:center;font-size:10px;padding:3px 4px">Contain</button>
+        <button class="tool-btn" onclick="bgPreset('reset')"   style="justify-content:center;font-size:10px;padding:3px 4px">Reset</button>
+      </div>
+      <div style="font-size:9px;color:#5a5040;line-height:1.4">Outil <b style="color:#8a7f6e">Fond</b> : glisser pour déplacer · molette pour zoomer</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+      <button class="tool-btn" onclick="clearBg()" style="justify-content:center;font-size:11px"><i class="ti ti-x"></i> Retirer</button>
+      <button class="tool-btn" onclick="clearDrawing()" style="justify-content:center;font-size:11px"><i class="ti ti-trash"></i> Dessin</button>
+    </div>
+
+    <div class="sb-title">Brouillard de guerre</div>
+    <div style="background:#0d0c09;border-radius:6px;padding:8px;display:flex;flex-direction:column;gap:7px">
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:10px;color:#8a7f6e;flex:1">Opacité (MJ)</span>
+        <span id="fog-opacity-label" style="font-size:11px;color:#ffd875;min-width:32px;text-align:right">70%</span>
+      </div>
+      <input type="range" id="fog-opacity-range" min="0" max="100" value="70" step="5"
+        oninput="onFogOpacity(this.value)"
+        style="width:100%;accent-color:#c49a1a;cursor:pointer">
+      <div style="display:flex;align-items:center;gap:5px">
+        <span style="font-size:10px;color:#8a7f6e;flex:1">Taille pinceau</span>
+        <span id="fog-brush-label" style="font-size:11px;color:#ffd875;min-width:32px;text-align:right">40px</span>
+      </div>
+      <input type="range" id="fog-brush-range" min="10" max="200" value="40" step="5"
+        oninput="onFogBrush(this.value)"
+        style="width:100%;accent-color:#c49a1a;cursor:pointer">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <button class="tool-btn" id="fog-reveal-btn" onclick="setFogMode(false)" style="justify-content:center;font-size:11px;background:#1a2a1a;border-color:#4fc97a;color:#4fc97a"><i class="ti ti-eye"></i> Révéler</button>
+        <button class="tool-btn" id="fog-hide-btn" onclick="setFogMode(true)" style="justify-content:center;font-size:11px"><i class="ti ti-eye-off"></i> Cacher</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <button class="tool-btn" onclick="fillFog()" style="justify-content:center;font-size:11px"><i class="ti ti-square-filled"></i> Tout cacher</button>
+        <button class="tool-btn" onclick="clearFog()" style="justify-content:center;font-size:11px"><i class="ti ti-square"></i> Tout révéler</button>
+      </div>
+    </div>
+
+    <div class="sb-title">Scènes (locales)</div>
+    <div style="display:flex;gap:4px">
+      <input class="mini-input" id="scene-name" placeholder="Nom de scène..." style="flex:1">
+      <button class="tool-btn" onclick="saveScene()" style="padding:4px 7px;flex-shrink:0" title="Sauvegarder"><i class="ti ti-device-floppy"></i></button>
+    </div>
+    <div id="scene-list" style="display:flex;flex-direction:column;gap:3px"></div>
+    </div><!-- /gm-only explosions+bg+scenes -->
+  </div>
+
+  <div id="canvas-wrap">
+    <div id="init-bar">
+      <div id="tour-badge" style="display:none">
+        <div class="tour-badge-label" style="font-size:8px;color:#5a5040;letter-spacing:1px">TOUR</div>
+        <div id="tour-badge-num" style="font-size:16px;font-weight:800;color:#ffd875;line-height:1.1">1</div>
+      </div>
+    </div>
+    <div id="presence-bar">
+      <div id="presence-dots"></div>
+      <div id="room-badge" onclick="copyRoomCode()" title="Cliquer pour copier le code">CODE : <span id="room-code-display">…</span></div>
+    </div>
+    <div class="role-badge" id="role-badge" style="display:none"></div>
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- ── NEW TURN BANNER ──────────────────────────────────────── -->
+  <div id="new-turn-banner">
+    <div class="ntb-label">☢ Nouveau Tour</div>
+    <div class="ntb-number" id="ntb-number">1</div>
+    <div class="ntb-sub">Tout le monde a joué</div>
+  </div>
+
+  <!-- ── DICE OVERLAY (shared roll) ────────────────────────────── -->
+  <div id="dice-overlay">
+    <div id="dice-overlay-inner">
+      <!-- Ligne 1 : qui + titre + badge push + close -->
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="ov-title">☢ JET DE DÉS</div>
+        <div class="ov-who" id="ov-who">—</div>
+        <div id="ov-push-badge" style="display:none"><span class="ov-push-badge">⚠ PUSH</span></div>
+        <div id="ov-hidden-badge" style="display:none"><span style="background:#1a1a2a;color:#60b0ff;border-radius:3px;font-size:9px;padding:1px 5px;font-weight:700">🔒 CACHÉ</span></div>
+        <button class="ov-close-btn" onclick="closeDiceOverlay()">✕</button>
+      </div>
+      <!-- Ligne 2 : dés + résumé + bouton push -->
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="ov-dice-wrap" id="ov-dice-wrap"></div>
+        <div style="width:1px;background:#2a2520;align-self:stretch;flex-shrink:0"></div>
+        <div class="ov-summary" id="ov-summary"></div>
+        <button class="ov-push-btn" id="ov-push-btn" onclick="dicePushFromOverlay()" style="display:none">⚠ PUSH</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DICE ROLLER ─────────────────────────────────────────────── -->
+  <div id="dice-panel">
+    <div class="sb-title">Lancer de dés ☢</div>
+
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <div class="dice-type-row">
+        <div style="width:20px;height:20px;border-radius:3px;background:#c49a1a;border:2px solid #ffd875;flex-shrink:0"></div>
+        <span class="dice-type-label">Base <span style="color:#5a5040;font-size:9px">(attribut)</span></span>
+        <button class="dice-count-btn" onclick="diceAdj('base',-1)">−</button>
+        <span class="dice-count-val" id="dc-base">0</span>
+        <button class="dice-count-btn" onclick="diceAdj('base',1)">+</button>
+      </div>
+      <div class="dice-type-row">
+        <div style="width:20px;height:20px;border-radius:3px;background:#1a3a1a;border:2px solid #4fc97a;flex-shrink:0"></div>
+        <span class="dice-type-label">Skill <span style="color:#5a5040;font-size:9px">(compétence)</span></span>
+        <button class="dice-count-btn" onclick="diceAdj('skill',-1)">−</button>
+        <span class="dice-count-val" id="dc-skill">0</span>
+        <button class="dice-count-btn" onclick="diceAdj('skill',1)">+</button>
+      </div>
+      <div class="dice-type-row">
+        <div style="width:20px;height:20px;border-radius:3px;background:#1a1a1a;border:2px solid #555;flex-shrink:0"></div>
+        <span class="dice-type-label">Gear <span style="color:#5a5040;font-size:9px">(équipement)</span></span>
+        <button class="dice-count-btn" onclick="diceAdj('gear',-1)">−</button>
+        <span class="dice-count-val" id="dc-gear">0</span>
+        <button class="dice-count-btn" onclick="diceAdj('gear',1)">+</button>
+      </div>
+      <div class="dice-type-row">
+        <div style="width:20px;height:20px;border-radius:3px;background:#2a0808;border:2px solid #e04040;flex-shrink:0"></div>
+        <span class="dice-type-label">Négatif <span style="color:#5a5040;font-size:9px">(skill −)</span></span>
+        <button class="dice-count-btn" onclick="diceAdj('neg',-1)">−</button>
+        <span class="dice-count-val" id="dc-neg">0</span>
+        <button class="dice-count-btn" onclick="diceAdj('neg',1)">+</button>
+      </div>
+    </div>
+
+    <label style="display:flex;align-items:center;gap:7px;font-size:11px;color:#8a7f6e;cursor:pointer;padding:4px 0">
+      <input type="checkbox" id="dice-hidden-chk" style="accent-color:#c49a1a;width:13px;height:13px">
+      <span>Jet caché <span style="color:#5a5040;font-size:9px">(MJ + lanceur uniquement)</span></span>
+    </label>
+
+    <button class="roll-btn" onclick="diceRoll()">☢ LANCER</button>
+
+    <div class="sb-title" id="dice-hist-title" style="display:none">Historique</div>
+    <div id="dice-history" style="display:flex;flex-direction:column;gap:3px;max-height:200px;overflow-y:auto"></div>
+  </div>
+
+<script type="module">
+// Defensive import — show clear error if Liveblocks CDN fails
+let createClient;
+try {
+  ({ createClient } = await import("./liveblocks.bundle.js"));
+} catch(e) {
+  document.getElementById('lobby-status').textContent =
+    'Impossible de charger Liveblocks. Vérifiez votre connexion internet.';
+  console.error('Liveblocks import failed:', e);
+}
+// ═══════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════
+const LB_PUBLIC_KEY = 'pk_dev_G3vH0RHqVSajd3mFTdhVx4dsXrM2O30_J_u7749vvizP-iKHbdNW2WfOO8_YWYYt';
+
+const PRESENCE_COLORS = ['#e04040','#4fc97a','#60b0ff','#e8a030','#c060e0','#e060a0','#ffd875','#40e0c0'];
+
+// ═══════════════════════════════════════════════════════════════
+// ZONES DATA
+// ═══════════════════════════════════════════════════════════════
+const ZONES = {
+  armslength:{label:"Arm's Length",color:'#60b0ff',desc:"Juste à côté — contact direct, mêlée possible.",mods:[['Attaque à distance','−3','neg'],['Attaque de mêlée','±0','neu'],['Sneak Attack','−2','neg'],['Fuite (jet Move)','−2','neg']],movement:"1 manœuvre vers Near",note:""},
+  near:{label:'Near',color:'#4fc97a',desc:"À quelques pas — quelques mètres.",mods:[['Attaque à distance','±0','neu'],['Attaque de mêlée','Reach only','neu'],['Sneak Attack','−1','neg'],['Fuite (jet Move)','−1','neg']],movement:"1 manœuvre vers Arm's Length ou Short",note:""},
+  short:{label:'Short',color:'#b8c830',desc:"Jusqu'à ~18–27 m.",mods:[['Attaque à distance','−1','neg'],['Attaque de mêlée','—','neu'],['Sneak Attack','±0','neu'],['Fuite (jet Move)','±0','neu']],movement:"1 manœuvre vers Near · 2 manœuvres consécutives vers Long",note:"⚠ Passer Short→Long coûte 2 manœuvres d'affilée : pas d'action ce tour."},
+  long:{label:'Long',color:'#e8a030',desc:"Jusqu'à quelques centaines de mètres.",mods:[['Attaque à distance','−2','neg'],['Attaque de mêlée','—','neu'],['Sneak Attack','+1','pos'],['Fuite (jet Move)','+1','pos']],movement:"2 manœuvres consécutives vers Short · 1 manœuvre vers Distant",note:"⚠ Revenir Long→Short coûte 2 manœuvres d'affilée : pas d'action ce tour."},
+  distant:{label:'Distant',color:'#e04040',desc:"Aussi loin que possible à vue.",mods:[['Attaque à distance','—','neu'],['Attaque de mêlée','—','neu'],['Sneak Attack','+2','pos'],['Fuite','Automatique','auto']],movement:"1 manœuvre vers Long",note:"Fuite automatique depuis Distant : aucun jet requis."}
+};
+
+const BASE_PION_R = 18;
+let PION_R = 18;
+const BASE_ARMS=50, BASE_NEAR=110, BASE_SHORT=220, BASE_LONG=440, BASE_DISTANT=620;
+let zoneScale=1, zoneOpacity=0.5;
+let ARMS_R=BASE_ARMS, NEAR_R=BASE_NEAR, SHORT_R=BASE_SHORT, LONG_R=BASE_LONG, DISTANT_R=BASE_DISTANT;
+function updateZoneRadii(){
+  const f=zoneScale*bgScale;
+  ARMS_R=Math.round(BASE_ARMS*f); NEAR_R=Math.round(BASE_NEAR*f);
+  SHORT_R=Math.round(BASE_SHORT*f); LONG_R=Math.round(BASE_LONG*f);
+  DISTANT_R=Math.round(BASE_DISTANT*f);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOCAL STATE
+// ═══════════════════════════════════════════════════════════════
+let myRole='gm'; // 'gm' | 'player'
+let myPionId=null; // id du pion du joueur (si player)
+
+let tool='select', pions=[], selected=null, bgImg=null, bgData=null;
+let bgX=0, bgY=0, bgScale=1, bgDragging=false, bgDragStart={x:0,y:0}, bgPosStart={x:0,y:0};
+let drawStrokes=[], currentStroke=null;
+let dragging=null, dragOffset={x:0,y:0}, dragOrigin=null;
+let mesureStart=null, mesureEnd=null, measuring=false;
+let newColor='#4fc97a', scenes=[];
+let currentTurnIdx=0, tourNumber=1;
+
+// ── FOG OF WAR ──────────────────────────────────────────────────
+let fogCanvas=null, fogCtx=null;
+let fogOpacity=0.7, fogBrushSize=40;
+let fogPainting=false, fogEraseMode=false;
+let fogSyncTimer=null;
+
+function initFogCanvas(w, h){
+  fogCanvas=document.createElement('canvas');
+  fogCanvas.width=w||CANVAS_W; fogCanvas.height=h||CANVAS_H;
+  fogCtx=fogCanvas.getContext('2d');
+  fogCtx.fillStyle='#000';
+  fogCtx.fillRect(0,0,fogCanvas.width,fogCanvas.height);
+}
+function fillFog(){
+  if(!fogCtx) return;
+  fogCtx.save();
+  fogCtx.globalCompositeOperation='source-over';
+  fogCtx.fillStyle='#000';
+  fogCtx.fillRect(0,0,fogCanvas.width,fogCanvas.height);
+  fogCtx.restore();
+  draw(); scheduleFogSync();
+}
+function clearFog(){
+  if(!fogCtx) return;
+  fogCtx.clearRect(0,0,fogCanvas.width,fogCanvas.height);
+  draw(); scheduleFogSync();
+}
+function onFogOpacity(v){
+  fogOpacity=parseInt(v)/100;
+  document.getElementById('fog-opacity-label').textContent=v+'%';
+  draw();
+}
+function onFogBrush(v){
+  fogBrushSize=parseInt(v);
+  document.getElementById('fog-brush-label').textContent=v+'px';
+}
+function setFogMode(eraseMode){
+  fogEraseMode=eraseMode;
+  const revBtn=document.getElementById('fog-reveal-btn');
+  const hideBtn=document.getElementById('fog-hide-btn');
+  if(eraseMode){
+    hideBtn.style.background='#2a1a00'; hideBtn.style.borderColor='#e8a030'; hideBtn.style.color='#e8a030';
+    revBtn.style.background=''; revBtn.style.borderColor=''; revBtn.style.color='#c4b89a';
+  } else {
+    revBtn.style.background='#1a2a1a'; revBtn.style.borderColor='#4fc97a'; revBtn.style.color='#4fc97a';
+    hideBtn.style.background=''; hideBtn.style.borderColor=''; hideBtn.style.color='#c4b89a';
+  }
+  if(tool!=='fog') setTool('fog');
+}
+// Convertit un point canvas → coordonnées image (espace fogCanvas)
+function canvasToFog(pt){
+  if(!bgImg||!bgScale) return pt;
+  return { x:(pt.x-bgX)/bgScale, y:(pt.y-bgY)/bgScale };
+}
+function paintFog(pt){
+  if(!fogCtx||!bgImg) return;
+  const fp=canvasToFog(pt);
+  const r=fogBrushSize/bgScale; // rayon converti en espace image
+  fogCtx.save();
+  if(fogEraseMode){
+    fogCtx.globalCompositeOperation='source-over';
+    fogCtx.fillStyle='#000';
+  } else {
+    fogCtx.globalCompositeOperation='destination-out';
+    fogCtx.fillStyle='rgba(0,0,0,1)';
+  }
+  fogCtx.beginPath();
+  fogCtx.arc(fp.x,fp.y,r,0,Math.PI*2);
+  fogCtx.fill();
+  fogCtx.restore();
+}
+function scheduleFogSync(){
+  clearTimeout(fogSyncTimer);
+  fogSyncTimer=setTimeout(()=>{
+    if(!lbRoot||!fogCanvas) return;
+    const data=fogCanvas.toDataURL('image/png');
+    fogCanvas._lastData=data;
+    ignoreRemote=true;
+    lbRoot.set('fogData', data);
+    setTimeout(()=>{ ignoreRemote=false; },100);
+  }, 300);
+}
+function applyRemoteFog(data){
+  if(!fogCanvas) return;
+  if(!data){ fogCtx.clearRect(0,0,fogCanvas.width,fogCanvas.height); draw(); return; }
+  const img=new Image();
+  img.onload=()=>{
+    fogCtx.clearRect(0,0,fogCanvas.width,fogCanvas.height);
+    fogCtx.drawImage(img,0,0,fogCanvas.width,fogCanvas.height);
+    draw();
+  };
+  img.src=data;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LIVEBLOCKS
+// ═══════════════════════════════════════════════════════════════
+let lbRoom=null, lbStorage=null, lbRoot=null;
+let myId=null, myName='', myColor='';
+let ignoreRemote=false; // prevent echo loop while we broadcast
+
+function setSyncDot(state){ // 'ok'|'wait'|'off'
+  const d=document.getElementById('sync-dot');
+  d.className='sync-dot'+(state==='ok'?' ':state==='off'?' off':' wait');
+}
+
+async function connectLiveblocks(roomId, pseudo){
+  if(!createClient) throw new Error('Liveblocks non chargé — vérifiez votre connexion internet.');
+  setSyncDot('wait');
+  const client = createClient({ publicApiKey: LB_PUBLIC_KEY });
+  const { room } = client.enterRoom(roomId, {
+    initialPresence:{ name:pseudo, color:myColor, cursor:null },
+    initialStorage:{
+      pions:[],
+      strokes:[],
+      bgData:null, bgX:0, bgY:0, bgScale:1,
+      currentTurnIdx:0, tourNumber:1,
+      fogData:null,
+      zoneScale:1,
+      lastDiceRoll:null
+    }
+  });
+  lbRoom = room;
+
+  // Connection status
+  room.subscribe('status', status => {
+    setSyncDot(status==='connected'?'ok':status==='disconnected'?'off':'wait');
+  });
+
+  // Presence (who is online)
+  room.subscribe('others', others => renderPresence(others));
+
+  // Storage ready
+  const { root } = await room.getStorage();
+  lbRoot = root;
+
+  // Initial load from storage
+  applyRemoteState();
+  // fogCanvas est initialisé dans le callback de chargement de l'image bg
+  // Si aucune image, on crée un fog plein canvas par défaut
+  if(!lbRoot.get('bgData')) initFogCanvas(CANVAS_W, CANVAS_H);
+
+  // Charger le fog initial depuis le storage
+  const initFogData = lbRoot.get('fogData');
+  if(initFogData && fogCanvas) applyRemoteFog(initFogData);
+
+  // Subscriber dédié fog — indépendant de ignoreRemote
+  let lastFogData = initFogData ?? null;
+  room.subscribe(root, () => {
+    const fd = lbRoot.get('fogData') ?? null;
+    if(fd !== lastFogData){
+      lastFogData = fd;
+      applyRemoteFog(fd);
+    }
+  }, { isDeep:true });
+
+  // Subscriber dédié dés — indépendant de ignoreRemote
+  let lastDiceRollRaw = null;
+  room.subscribe(root, () => {
+    const raw = lbRoot.get('lastDiceRoll');
+    if(raw && raw !== lastDiceRollRaw){
+      lastDiceRollRaw = raw;
+      applyRemoteDiceRoll(raw);
+    }
+  }, { isDeep:true });
+
+  // Listen to storage changes from others (state général)
+  room.subscribe(root, () => {
+    if(!ignoreRemote) applyRemoteState();
+  }, { isDeep:true });
+
+  setSyncDot('ok');
+}
+
+function getRemoteState(){
+  if(!lbRoot) return null;
+  return {
+    pions:        lbRoot.get('pions')        ?? [],
+    strokes:      lbRoot.get('strokes')      ?? [],
+    bgData:       lbRoot.get('bgData')       ?? null,
+    bgX:          lbRoot.get('bgX')          ?? 0,
+    bgY:          lbRoot.get('bgY')          ?? 0,
+    bgScale:      lbRoot.get('bgScale')      ?? 1,
+    currentTurnIdx: lbRoot.get('currentTurnIdx') ?? 0,
+    tourNumber:   lbRoot.get('tourNumber')   ?? 1,
+    zoneScale:    lbRoot.get('zoneScale')    ?? 1,
+  };
+}
+
+function applyRemoteState(){
+  const s = getRemoteState();
+  if(!s) return;
+
+  pions = JSON.parse(JSON.stringify(s.pions));
+  if(selected) selected = pions.find(p=>p.id===selected.id) ?? null;
+  drawStrokes = JSON.parse(JSON.stringify(s.strokes));
+  currentTurnIdx = s.currentTurnIdx;
+  const prevTourNumber = tourNumber;
+  tourNumber     = s.tourNumber;
+  if(tourNumber > prevTourNumber) showNewTurnBanner(tourNumber);
+  // Taille des zones — imposée par le MJ pour tout le monde
+  if(s.zoneScale && s.zoneScale !== zoneScale){
+    zoneScale = s.zoneScale;
+    updateZoneRadii();
+    const el=document.getElementById('zone-scale-label');
+    if(el) el.textContent=Math.round(zoneScale*100)+'%';
+    const sl=document.getElementById('zone-scale-range');
+    if(sl) sl.value=Math.round(zoneScale*100);
+  }
+  bgX = s.bgX * CANVAS_W; bgY = s.bgY * CANVAS_H; bgScale = s.bgScale;
+  PION_R = Math.max(6, BASE_PION_R * bgScale);
+  updateZoneRadii();
+
+  // Reload bg image only if it changed
+  const newBgData = s.bgData;
+  if(newBgData && newBgData !== bgData){
+    bgData = newBgData;
+    const img = new Image();
+    img.onload = () => {
+      bgImg=img;
+      // (Re)créer fogCanvas aux dimensions de l'image si nécessaire
+      if(!fogCanvas || fogCanvas.width!==img.width || fogCanvas.height!==img.height){
+        const fd = lbRoot ? lbRoot.get('fogData') : null;
+        initFogCanvas(img.width, img.height);
+        if(fd) applyRemoteFog(fd);
+      }
+      syncBgUI(); draw();
+    };
+    img.src = newBgData;
+  } else if(!newBgData){
+    bgData = null; bgImg = null; syncBgUI();
+  }
+
+  renderPionList(); renderDist();
+  if(!newBgData || bgImg) draw();
+  // If the role screen is open on the player pion selection, refresh it live
+  if(document.getElementById('role-screen').style.display!=='none'
+     && document.getElementById('role-pion-select').style.display!=='none'){
+    refreshRolePionList();
+  }
+}
+
+function refreshRolePionList(){
+  const list=document.getElementById('role-pion-list');
+  const existingDiv=document.getElementById('role-pion-existing');
+  const pjPions=pions.filter(p=>p.shape==='circle');
+  if(!pjPions.length){
+    existingDiv.style.display='none';
+  } else {
+    existingDiv.style.display='flex';
+    list.innerHTML=pjPions.map(p=>`
+      <div class="rpion-btn ${p.id===myPionId?'sel':''}" id="rpion-${p.id}" onclick="selectMyPion(${p.id})">
+        <div style="width:10px;height:10px;border-radius:50%;background:${p.color};flex-shrink:0"></div>
+        ${p.name}
+      </div>`).join('');
+  }
+}
+
+function pushState(partial={}){
+  if(!lbRoot) return;
+  ignoreRemote = true;
+  lbRoom.batch(() => {
+    // Always push full state to keep it consistent
+    lbRoot.set('pions', JSON.parse(JSON.stringify(pions)));
+    lbRoot.set('strokes',     JSON.parse(JSON.stringify(drawStrokes)));
+    lbRoot.set('currentTurnIdx', currentTurnIdx);
+    lbRoot.set('tourNumber',  tourNumber);
+    if(partial.bg !== undefined){
+      lbRoot.set('bgData',  partial.bg?.data  ?? null);
+      lbRoot.set('bgX',     (partial.bg?.x ?? bgX) / CANVAS_W);
+      lbRoot.set('bgY',     (partial.bg?.y ?? bgY) / CANVAS_H);
+      lbRoot.set('bgScale', partial.bg?.scale ?? bgScale);
+    } else {
+      lbRoot.set('bgX',     bgX / CANVAS_W);
+      lbRoot.set('bgY',     bgY / CANVAS_H);
+      lbRoot.set('bgScale', bgScale);
+    }
+  });
+  setTimeout(()=>{ ignoreRemote=false; }, 100);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// LOBBY
+// ═══════════════════════════════════════════════════════════════
+function randomCode(){
+  const words=['WOLF','ZONE','RUST','BONE','CROW','DUST','SCAR','IRON','VEIL','GRIT'];
+  return words[Math.floor(Math.random()*words.length)]+'-'+Math.floor(10+Math.random()*90);
+}
+function randomColor(){ return PRESENCE_COLORS[Math.floor(Math.random()*PRESENCE_COLORS.length)]; }
+
+async function createRoom(){
+  const pseudo = document.getElementById('lby-pseudo').value.trim()||'MJ';
+  const code   = randomCode();
+  setLobbyStatus('Création de la salle…');
+  await startSession(code, pseudo);
+}
+async function joinRoom(){
+  const pseudo = document.getElementById('lby-pseudo').value.trim()||'Joueur';
+  const code   = document.getElementById('lby-code').value.trim().toUpperCase();
+  if(!code){ setLobbyStatus('Entrez un code de salle.'); return; }
+  setLobbyStatus('Connexion…');
+  await startSession(code, pseudo);
+}
+// Expose immediately after definition so onclick= handlers work
+// even if the rest of the module hasn't finished loading yet
+window.createRoom = createRoom;
+window.joinRoom   = joinRoom;
+async function startSession(code, pseudo){
+  myName  = pseudo;
+  myColor = randomColor();
+  myId    = 'user-'+Date.now();
+  try{
+    await connectLiveblocks('myz-'+code, pseudo);
+    document.getElementById('room-code-display').textContent = code;
+    document.getElementById('lobby').style.display = 'none';
+    // Show role selection screen
+    document.getElementById('role-pseudo-display').textContent = pseudo;
+    document.getElementById('role-screen').style.display = 'flex';
+    document.getElementById('bg-file').addEventListener('change', onBgFileChange);
+    initScenes();
+  } catch(e){
+    setLobbyStatus('Erreur de connexion : '+e.message);
+  }
+}
+function selectRole(role){
+  myRole = role;
+  document.getElementById('rc-gm').classList.toggle('sel', role==='gm');
+  document.getElementById('rc-player').classList.toggle('sel', role==='player');
+  const pionSel = document.getElementById('role-pion-select');
+  const confirmBtn = document.getElementById('role-confirm');
+  if(role==='gm'){
+    pionSel.style.display='none';
+    confirmBtn.style.display='block';
+    myPionId=null;
+  } else {
+    pionSel.style.display='flex';
+    confirmBtn.style.display='none';
+    myPionId=null;
+    // Set default color selection
+    document.querySelector('#role-pion-select .color-swatch.sel')?.classList.remove('sel');
+    const firstSwatch=document.querySelector('#role-pion-select .color-swatch');
+    if(firstSwatch){ firstSwatch.classList.add('sel'); firstSwatch.style.borderColor='#ffd875'; }
+    // Populate existing PJ pions
+    refreshRolePionList();
+  }
+}
+
+let roleColor='#4fc97a';
+function rolePickColor(el){
+  document.querySelectorAll('#role-pion-select .color-swatch').forEach(s=>{
+    s.classList.remove('sel'); s.style.borderColor='transparent';
+  });
+  el.classList.add('sel'); el.style.borderColor='#ffd875';
+  roleColor=el.dataset.c;
+}
+
+function createAndSelectPion(){
+  const name=document.getElementById('role-new-name').value.trim()||myName||'Joueur';
+  // Create the pion directly in shared state
+  const id=Date.now();
+  const newPion={id, name, shape:'circle', color:roleColor,
+    x:CANVAS_W/2+(Math.random()-.5)*200,
+    y:CANVAS_H/2+(Math.random()-.5)*200,
+    states:[], initiative:0, played:false};
+  pions.push(newPion);
+  pushState();
+  myPionId=id;
+  document.getElementById('role-status').textContent='';
+  document.getElementById('role-confirm').style.display='block';
+  // Visual feedback
+  document.querySelectorAll('.rpion-btn').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('role-status').textContent=`✓ Pion "${name}" créé !`;
+}
+
+function selectMyPion(id){
+  myPionId=id;
+  document.querySelectorAll('.rpion-btn').forEach(b=>b.classList.remove('sel'));
+  document.getElementById('rpion-'+id)?.classList.add('sel');
+  document.getElementById('role-confirm').style.display='block';
+}
+
+function confirmRole(){
+  if(myRole==='player' && !myPionId){
+    document.getElementById('role-status').textContent='Sélectionne ton pion d\'abord.';
+    return;
+  }
+  document.getElementById('role-screen').style.display='none';
+  document.getElementById('app').style.display='flex';
+  applyRoleUI();
+  setTimeout(()=>{ resize(); renderExplZones(); renderPionList(); },80);
+}
+
+function applyRoleUI(){
+  const isGM = myRole==='gm';
+  // Badge
+  const badge = document.getElementById('role-badge');
+  badge.style.display='block';
+  if(isGM){
+    badge.textContent='🎲 MJ';
+    badge.style.color='#ffd875';
+  } else {
+    const p = pions.find(x=>x.id===myPionId);
+    badge.innerHTML=`⚔️ Joueur${p?` — <span style="color:${p.color}">${p.name}</span>`:''}`;
+  }
+  // Hide GM-only sections for players
+  document.querySelectorAll('.gm-only').forEach(el=>{
+    el.style.display = isGM ? 'contents' : 'none';
+  });
+  // Restrict toolbar buttons for players
+  if(!isGM){
+    ['btn-draw','btn-erase','btn-bg','btn-fog'].forEach(id=>{
+      const btn=document.getElementById(id);
+      if(btn) btn.style.display='none';
+    });
+    // Force select tool
+    setTool('select');
+  }
+}
+window.selectRole=selectRole; window.selectMyPion=selectMyPion; window.confirmRole=confirmRole;
+window.rolePickColor=rolePickColor; window.createAndSelectPion=createAndSelectPion;
+function setLobbyStatus(msg){ document.getElementById('lobby-status').textContent=msg; }
+function copyRoomCode(){
+  const code=document.getElementById('room-code-display').textContent;
+  navigator.clipboard?.writeText(code).then(()=>{ setLobbyStatus&&(document.getElementById('room-badge').textContent='Copié !'); setTimeout(()=>document.getElementById('room-badge').innerHTML='CODE : <span id="room-code-display">'+code+'</span>',1500); });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PRESENCE
+// ═══════════════════════════════════════════════════════════════
+function renderPresence(others){
+  const container = document.getElementById('presence-dots');
+  const arr = [...others];
+  container.innerHTML = arr.map(o=>{
+    const name  = o.presence?.name  || '?';
+    const color = o.presence?.color || '#8a7f6e';
+    return `<div class="presence-dot" style="background:${color}" title="${name}">${name.charAt(0).toUpperCase()}</div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ZONE SCALE / OPACITY
+// ═══════════════════════════════════════════════════════════════
+function setZoneOpacity(v){
+  zoneOpacity=parseFloat(v);
+  document.getElementById('zone-opacity-label').textContent=Math.round(v*100)+'%';
+  draw();
+}
+function setZoneScale(v){
+  zoneScale=parseFloat(v);
+  updateZoneRadii();
+  document.getElementById('zone-scale-label').textContent=Math.round(zoneScale*100)+'%';
+  const el=document.getElementById('zone-scale-range');
+  if(el) el.value=Math.round(zoneScale*100);
+  if(selected)renderDist();
+  draw();
+  // Sync vers tous les joueurs
+  if(lbRoot){ ignoreRemote=true; lbRoot.set('zoneScale',zoneScale); setTimeout(()=>{ ignoreRemote=false; },100); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CANVAS
+// ═══════════════════════════════════════════════════════════════
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('canvas-wrap');
+
+function getZoneKey(d){
+  if(d<=ARMS_R)  return 'armslength';
+  if(d<=NEAR_R)  return 'near';
+  if(d<=SHORT_R) return 'short';
+  if(d<=LONG_R)  return 'long';
+  return 'distant';
+}
+const CANVAS_W=1920, CANVAS_H=1080;
+function resize(){
+  canvas.width=CANVAS_W; canvas.height=CANVAS_H;
+  const availW=wrap.clientWidth;
+  const availH=wrap.clientHeight;
+  const scale=Math.min(availW/CANVAS_W, availH/CANVAS_H);
+  canvas.style.width=Math.round(CANVAS_W*scale)+'px';
+  canvas.style.height=Math.round(CANVAS_H*scale)+'px';
+  canvas.style.display='block';
+  canvas.style.margin='52px auto 0';
+  canvas._cssScale=scale;
+  draw();
+}
+window.addEventListener('resize',resize);
+
+function setTool(t){
+  // Players can only use select and mesure
+  if(myRole==='player' && !['select','mesure'].includes(t)) return;
+  tool=t;
+  document.querySelectorAll('.tool-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+t)?.classList.add('active');
+  canvas.style.cursor=t==='select'?'default':t==='bg'?(bgImg?'grab':'default'):t==='fog'?'crosshair':'crosshair';
+  if(t!=='mesure'){mesureStart=null;mesureEnd=null;showZoneCard(null);}
+  draw();
+}
+function pickColor(el){
+  document.querySelectorAll('.color-swatch').forEach(s=>s.classList.remove('sel'));
+  el.classList.add('sel'); newColor=el.dataset.c;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PIONS
+// ═══════════════════════════════════════════════════════════════
+function addPion(){
+  const name=document.getElementById('new-name').value.trim()||'?';
+  const shape=document.getElementById('new-shape').value;
+  const initVal=parseInt(document.getElementById('new-init').value)||0;
+  pions.push({id:Date.now(),name,shape,color:newColor,
+    x:canvas.width/2+(Math.random()-.5)*120,
+    y:canvas.height/2+(Math.random()-.5)*120,
+    states:[],initiative:initVal});
+  document.getElementById('new-name').value='';
+  document.getElementById('new-init').value='';
+  renderPionList(); draw(); pushState();
+}
+function removePion(id){
+  pions=pions.filter(p=>p.id!==id);
+  if(selected?.id===id) selected=null;
+  if(currentTurnIdx>=pions.length) currentTurnIdx=Math.max(0,pions.length-1);
+  renderPionList(); draw(); pushState();
+}
+function selectPion(p){
+  selected=selected?.id===p.id?null:p;
+  renderPionList(); renderDist(); showZoneCard(null); draw();
+}
+function renderPionList(){
+  pions.forEach(p=>{ if(p.initiative===undefined) p.initiative=0; });
+  const order=getInitOrder();
+  const rankMap=new Map(order.map((p,i)=>[p.id,i+1]));
+  const turnEl=document.getElementById('init-turn-display');
+  if(order.length){
+    turnEl.style.display='block';
+    const cur=order[currentTurnIdx]||order[0];
+    turnEl.textContent=`Tour ${currentTurnIdx+1}/${order.length} — ${cur.name}`;
+  } else { turnEl.style.display='none'; }
+  const sorted=[...pions].sort((a,b)=>(b.initiative||0)-(a.initiative||0)||a.name.localeCompare(b.name));
+  const activeCurId=order[currentTurnIdx]?.id;
+  const isGM = myRole==='gm';
+  document.getElementById('pion-list').innerHTML=sorted.map(p=>{
+    const rank=rankMap.get(p.id)||'—';
+    const isActive=p.id===activeCurId;
+    const isSel=selected?.id===p.id;
+    const isMyPion=p.id===myPionId;
+    return `<div class="pion-item ${isSel?'selected':''}" style="${isActive?'border-color:#ffd875;background:#1e1a0e':''}" onclick="selectPion(pions.find(x=>x.id===${p.id}))">
+      <span class="pion-rank ${isActive?'top':''}">${rank}</span>
+      <div class="pion-dot ${p.shape==='square'?'sq':''}" style="background:${p.color}${!isGM&&!isMyPion?';opacity:.5':''}"></div>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px${!isGM&&isMyPion?';color:#ffd875':''}">${p.name}${!isGM&&isMyPion?' ★':''}</span>
+      ${(isGM || isMyPion)?`
+      <button class="pion-adj" onclick="event.stopPropagation();adjustInit(${p.id},-1)">−</button>
+      <input class="pion-init" type="number" value="${p.initiative||0}" min="-99" max="99"
+        data-id="${p.id}"
+        style="-moz-appearance:textfield;appearance:textfield"
+        onclick="event.stopPropagation()"
+        onchange="event.stopPropagation();setInitiative(${p.id},this.value)"
+        oninput="event.stopPropagation();setInitiative(${p.id},this.value)">
+      <button class="pion-adj" onclick="event.stopPropagation();adjustInit(${p.id},1)">+</button>
+      <button class="pion-roll-btn" onclick="event.stopPropagation();rollInit(${p.id},1)" title="Roll 1d6">1d6</button>
+      <button class="pion-roll-btn" onclick="event.stopPropagation();rollInit(${p.id},2)" title="Roll 2d6">2d6</button>
+      ${isGM?`<button onclick="event.stopPropagation();removePion(${p.id})" style="background:none;border:none;color:#5a5040;cursor:pointer;font-size:13px;padding:0 2px">×</button>`:''}
+      `:`<span style="font-size:11px;font-weight:700;color:#ffd875;min-width:22px;text-align:center">${p.initiative||0}</span>`}
+    </div>`;
+  }).join('');
+}
+
+function showNewTurnBanner(n){
+  const banner = document.getElementById('new-turn-banner');
+  document.getElementById('ntb-number').textContent = n;
+  banner.className = ''; // reset
+  banner.style.display = 'flex';
+  // Fade out après 2.5s
+  setTimeout(()=>{
+    banner.classList.add('fade-out');
+    setTimeout(()=>{ banner.style.display='none'; banner.classList.remove('fade-out'); }, 600);
+  }, 2500);
+}
+function getInitOrder(){ return [...pions].filter(p=>p.initiative!==undefined).sort((a,b)=>(b.initiative||0)-(a.initiative||0)||a.name.localeCompare(b.name)); }
+function renderInitList(){ renderPionList(); }
+function setInitiative(id,val){
+  const p=pions.find(x=>x.id===id); if(!p) return;
+  p.initiative=parseInt(val)||0;
+  const order=getInitOrder(); const activeId=order[currentTurnIdx]?.id;
+  const newIdx=order.findIndex(x=>x.id===activeId); if(newIdx>=0) currentTurnIdx=newIdx;
+  renderInitBar(); pushState();
+}
+function adjustInit(id,delta){
+  const p=pions.find(x=>x.id===id); if(!p) return;
+  p.initiative=(p.initiative||0)+delta;
+  // Update the input field directly to avoid full re-render
+  const input=document.querySelector(`.pion-init[data-id="${id}"]`);
+  if(input) input.value=p.initiative;
+  setInitiative(id,p.initiative);
+}
+function rollInit(id,dice){
+  const p=pions.find(x=>x.id===id); if(!p) return;
+  let total;
+  if(dice===2){ const a=Math.ceil(Math.random()*6),b=Math.ceil(Math.random()*6); total=Math.max(a,b); }
+  else { total=Math.ceil(Math.random()*6); }
+  p.initiative=total;
+  const input=document.querySelector(`.pion-init[data-id="${id}"]`);
+  if(input) input.value=total;
+  setInitiative(id,total);
+}
+function nextTurn(){
+  const order=getInitOrder(); if(!order.length) return;
+  // Joueurs : ne peuvent avancer que si c'est leur tour
+  if(myRole!=='gm'){
+    const activePion=order[currentTurnIdx];
+    if(!activePion || activePion.id!==myPionId) return;
+  }
+  const cur=order[currentTurnIdx]; if(cur) cur.played=true;
+  const allPlayed=order.every(p=>p.played);
+  if(allPlayed){ tourNumber++; order.forEach(p=>p.played=false); currentTurnIdx=0; showNewTurnBanner(tourNumber); }
+  else {
+    let next=(currentTurnIdx+1)%order.length;
+    let safety=0;
+    while(order[next]?.played && safety++<order.length) next=(next+1)%order.length;
+    currentTurnIdx=next;
+  }
+  renderPionList(); renderInitList(); pushState();
+}
+function prevTurn(){
+  const order=getInitOrder(); if(!order.length) return;
+  currentTurnIdx=Math.max(0,currentTurnIdx-1); renderPionList(); renderInitList(); pushState();
+}
+function resetTurn(){ currentTurnIdx=0; tourNumber=1; pions.forEach(p=>p.played=false); renderPionList(); renderInitList(); pushState(); }
+function renderInitBar(){
+  const order=getInitOrder();
+  const bar=document.getElementById('init-bar');
+  // Badge tour — toujours affiché s'il y a des pions
+  const badge=document.getElementById('tour-badge');
+  const badgeNum=document.getElementById('tour-badge-num');
+  if(badge){ badge.style.display=order.length?'flex':'none'; if(badgeNum) badgeNum.textContent=tourNumber; }
+  if(!order.length){
+    // Garder seulement le badge
+    const existing=[...bar.children].filter(c=>c.id!=='tour-badge');
+    existing.forEach(c=>c.remove());
+    return;
+  }
+  // Reconstruire les slots (sauf le badge)
+  const existing=[...bar.children].filter(c=>c.id!=='tour-badge');
+  existing.forEach(c=>c.remove());
+  const frag=document.createDocumentFragment();
+  order.forEach((p,i)=>{
+    const isActive=i===currentTurnIdx;
+    const shapeCls=p.shape==='square'?'sq':p.shape==='star'?'star':'';
+    // Joueur : clickable seulement si c'est son pion ET c'est son tour (pour passer)
+    const clickable = myRole==='gm';
+    const slot=document.createElement('div');
+    slot.className=`ibar-slot ${isActive?'active':''} ${p.played?'played':''}`;
+    slot.style.cursor=clickable?'pointer':'default';
+    slot.innerHTML=`<div class="ibar-dot ${shapeCls}" style="background:${p.color}"></div>
+      <span class="ibar-name">${p.name}</span>
+      <span class="ibar-score">${p.initiative||0}</span>`;
+    if(clickable) slot.onclick=()=>{ currentTurnIdx=i; renderPionList(); renderInitList(); pushState(); };
+    frag.appendChild(slot);
+    if(i<order.length-1){
+      const sep=document.createElement('div');
+      sep.className='ibar-sep'; frag.appendChild(sep);
+    }
+  });
+  bar.insertBefore(frag, badge);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DISTANCES
+// ═══════════════════════════════════════════════════════════════
+function showZoneCard(zkey){
+  const el=document.getElementById('zone-card');
+  if(!zkey||!ZONES[zkey]){el.classList.remove('visible');return;}
+  const z=ZONES[zkey]; el.classList.add('visible');
+  el.style.borderLeftColor=z.color;
+  document.getElementById('zc-title').textContent=z.label;
+  document.getElementById('zc-title').style.color=z.color;
+  document.getElementById('zc-desc').textContent=z.desc;
+  document.getElementById('zc-mods').innerHTML=z.mods.map(([label,val,cls])=>`<tr><td style="color:#8a7f6e">${label}</td><td class="${cls}">${val}</td></tr>`).join('')+`<tr style="border-top:1px solid #2a2520"><td style="color:#8a7f6e">Mouvement</td><td class="neu" style="font-size:9px;text-align:right">${z.movement}</td></tr>`;
+  const noteEl=document.getElementById('zc-note');
+  noteEl.textContent=z.note; noteEl.style.display=z.note?'block':'none';
+}
+function renderDist(){
+  const el=document.getElementById('dist-panel');
+  if(!selected){
+    if(mesureStart&&mesureEnd){
+      const d=Math.hypot(mesureEnd.x-mesureStart.x,mesureEnd.y-mesureStart.y);
+      const zk=getZoneKey(d); const z=zk?ZONES[zk]:ZONES['distant'];
+      el.innerHTML=`<div class="dist-row" style="cursor:default"><span style="color:#8a7f6e">Distance mesurée</span><span style="color:${z.color};font-weight:500">${z.label}</span></div>`;
+      showZoneCard(zk);
+    } else { el.innerHTML='<span style="color:#5a5040">Sélectionne un pion ou mesure</span>'; showZoneCard(null); }
+    return;
+  }
+  const others=pions.filter(p=>p.id!==selected.id);
+  if(!others.length){ el.innerHTML='<span style="color:#5a5040">Aucun autre pion</span>'; return; }
+  el.innerHTML=others.map(o=>{
+    const d=Math.hypot(o.x-selected.x,o.y-selected.y);
+    const zk=getZoneKey(d); const z=ZONES[zk]||ZONES['distant'];
+    return `<div class="dist-row" onclick="showZoneCard('${zk}')">
+      <span style="display:flex;align-items:center;gap:4px"><div style="width:8px;height:8px;border-radius:50%;background:${o.color};flex-shrink:0"></div>${o.name}</span>
+      <span style="color:${z.color};font-weight:500">${z.label}</span></div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRAW
+// ═══════════════════════════════════════════════════════════════
+function draw(){
+  const w=canvas.width, h=canvas.height;
+  ctx.clearRect(0,0,w,h);
+  if(bgImg){
+    ctx.save(); ctx.globalAlpha=0.85;
+    ctx.drawImage(bgImg,bgX,bgY,bgImg.width*bgScale,bgImg.height*bgScale);
+    ctx.restore();
+  }
+  // Fog of war — ancré sur l'image, MJ voit semi-transparent, joueurs voient opaque
+  if(fogCanvas && bgImg){
+    const alpha = myRole==='gm' ? fogOpacity : 1.0;
+    ctx.save(); ctx.globalAlpha=alpha;
+    ctx.drawImage(fogCanvas, bgX, bgY, bgImg.width*bgScale, bgImg.height*bgScale);
+    ctx.restore();
+  } else if(fogCanvas && !bgImg){
+    // Pas d'image : fog plein écran (comportement legacy)
+    const alpha = myRole==='gm' ? fogOpacity : 1.0;
+    ctx.save(); ctx.globalAlpha=alpha;
+    ctx.drawImage(fogCanvas,0,0);
+    ctx.restore();
+  }
+  drawLines();
+  drawStrokes.forEach(s=>drawStroke(s));
+  if(currentStroke) drawStroke(currentStroke);
+  if(selected) drawRangeCircles(dragging?{...dragging,x:dragOrigin.x,y:dragOrigin.y}:selected);
+  pions.forEach(p=>drawPion(p));
+  renderInitBar();
+  if(mesureStart&&mesureEnd) drawMesure();
+  // Curseur pinceau brouillard
+  if(tool==='fog' && fogCursorPt && myRole==='gm'){
+    const cursorColor = fogEraseMode ? 'rgba(232,160,48,0.9)' : 'rgba(79,201,122,0.9)';
+    const cursorFill  = fogEraseMode ? 'rgba(232,160,48,0.08)' : 'rgba(79,201,122,0.08)';
+    ctx.save();
+    ctx.beginPath(); ctx.arc(fogCursorPt.x,fogCursorPt.y,fogBrushSize,0,Math.PI*2);
+    ctx.strokeStyle=cursorColor; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+    ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=cursorFill; ctx.fill();
+    ctx.restore();
+  }
+}
+function drawRangeCircles(p){
+  const zones=[
+    {r:DISTANT_R,color:'#e04040',label:'Distant'},
+    {r:LONG_R,color:'#e8a030',label:'Long'},
+    {r:SHORT_R,color:'#b8c830',label:'Short'},
+    {r:NEAR_R,color:'#4fc97a',label:'Near'},
+    {r:ARMS_R,color:'#60b0ff',label:"Arm's"},
+  ];
+  ctx.save();
+  zones.forEach(z=>{
+    ctx.beginPath(); ctx.arc(p.x,p.y,z.r,0,Math.PI*2);
+    ctx.globalAlpha=zoneOpacity*0.25; ctx.fillStyle=z.color; ctx.fill();
+    ctx.globalAlpha=zoneOpacity*0.7; ctx.strokeStyle=z.color; ctx.lineWidth=1; ctx.setLineDash([4,4]); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.globalAlpha=zoneOpacity*0.8; ctx.fillStyle=z.color; ctx.font='10px sans-serif'; ctx.textAlign='left';
+    ctx.fillText(z.label,p.x+z.r+4,p.y); ctx.globalAlpha=1;
+  });
+  ctx.restore();
+}
+function drawLines(){
+  pions.forEach(p=>{
+    if(!selected) return;
+    if(p.id===selected.id) return;
+    const d=Math.hypot(p.x-selected.x,p.y-selected.y);
+    const zk=getZoneKey(d); const z=ZONES[zk]||ZONES['distant'];
+    ctx.save(); ctx.strokeStyle=z.color; ctx.lineWidth=1; ctx.globalAlpha=0.3; ctx.setLineDash([3,5]);
+    ctx.beginPath(); ctx.moveTo(selected.x,selected.y); ctx.lineTo(p.x,p.y); ctx.stroke();
+    ctx.restore();
+  });
+}
+function drawPion(p){
+  const r=PION_R; const isDragged=dragging?.id===p.id; const isSel=selected?.id===p.id;
+  const x=isDragged?dragOrigin.x:p.x; const y=isDragged?dragOrigin.y:p.y;
+  ctx.save();
+  if(isDragged||isSel){ctx.shadowColor=p.color;ctx.shadowBlur=12;}
+  ctx.fillStyle=p.color;
+  ctx.beginPath();
+  if(p.shape==='square'){ctx.rect(x-r,y-r,r*2,r*2);}
+  else if(p.shape==='star'){
+    for(let i=0;i<5;i++){
+      const ao=Math.PI/2; const a1=ao+i*(2*Math.PI/5); const a2=ao+(i+.5)*(2*Math.PI/5);
+      if(i===0) ctx.moveTo(x+r*Math.cos(a1),y-r*Math.sin(a1));
+      else ctx.lineTo(x+r*Math.cos(a1),y-r*Math.sin(a1));
+      ctx.lineTo(x+(r*.45)*Math.cos(a2),y-(r*.45)*Math.sin(a2));
+    }
+    ctx.closePath();
+  } else {ctx.arc(x,y,r,0,Math.PI*2);}
+  ctx.fill();
+  if(isSel){ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.stroke();}
+  ctx.shadowBlur=0;
+  ctx.fillStyle='#111'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(p.name.slice(0,4),x,y);
+  ctx.restore();
+}
+function drawStroke(s){
+  if(!s.pts||s.pts.length<2) return;
+  ctx.save(); ctx.strokeStyle=s.color||'#e04040'; ctx.lineWidth=s.width||3;
+  ctx.lineCap='round'; ctx.lineJoin='round'; ctx.globalAlpha=s.alpha||0.85;
+  ctx.beginPath(); ctx.moveTo(s.pts[0].x,s.pts[0].y);
+  s.pts.slice(1).forEach(pt=>ctx.lineTo(pt.x,pt.y)); ctx.stroke(); ctx.restore();
+}
+function drawMesure(){
+  const d=Math.hypot(mesureEnd.x-mesureStart.x,mesureEnd.y-mesureStart.y);
+  const zk=getZoneKey(d); const z=ZONES[zk]||ZONES['distant'];
+  const mx=(mesureStart.x+mesureEnd.x)/2, my=(mesureStart.y+mesureEnd.y)/2;
+  ctx.save();
+
+  // Ligne en tirets
+  ctx.strokeStyle=z.color; ctx.lineWidth=2; ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(mesureStart.x,mesureStart.y); ctx.lineTo(mesureEnd.x,mesureEnd.y); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Points aux extrémités
+  [mesureStart,mesureEnd].forEach(pt=>{
+    ctx.beginPath(); ctx.arc(pt.x,pt.y,4,0,Math.PI*2);
+    ctx.fillStyle=z.color; ctx.fill();
+  });
+
+  // Bulle de mods au milieu
+  const allLines=[z.label,...z.mods.map(([lbl,val])=>`${lbl}  ${val}`)];
+  const pad=8, lineH=15, fSize=10;
+  const bw=Math.max(...allLines.map(l=>l.length))*fSize*0.52+pad*2;
+  const bh=allLines.length*lineH+pad*1.2;
+  const flipY=my>canvas.height*0.6;
+  const bx=mx-bw/2, by=flipY?my-bh-10:my+10;
+
+  ctx.shadowBlur=12; ctx.shadowColor='#000a';
+  ctx.fillStyle='#13110e'; ctx.strokeStyle=z.color; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.roundRect(bx,by,bw,bh,6); ctx.fill(); ctx.stroke();
+  ctx.shadowBlur=0;
+
+  // Zone label
+  ctx.textAlign='left'; ctx.textBaseline='top';
+  ctx.font=`bold ${fSize+1}px sans-serif`; ctx.fillStyle=z.color;
+  ctx.fillText(z.label,bx+pad,by+pad*0.6);
+
+  // Lignes de mods
+  ctx.font=`${fSize}px sans-serif`;
+  z.mods.forEach(([lbl,val,cls],i)=>{
+    const rowY=by+pad*0.6+(i+1)*lineH;
+    const valColor=cls==='pos'?'#4fc97a':cls==='neg'?'#e04040':cls==='auto'?'#60b0ff':'#c4b89a';
+    ctx.fillStyle='#8a7f6e'; ctx.textAlign='left'; ctx.fillText(lbl,bx+pad,rowY);
+    ctx.fillStyle=valColor; ctx.textAlign='right'; ctx.fillText(val,bx+bw-pad,rowY);
+  });
+
+  ctx.restore();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MOUSE / TOUCH
+// ═══════════════════════════════════════════════════════════════
+function ptFromEvent(e){
+  const r=canvas.getBoundingClientRect();
+  const src=e.touches?e.touches[0]:e;
+  const scale=canvas._cssScale||1;
+  return {x:(src.clientX-r.left)/scale, y:(src.clientY-r.top)/scale};
+}
+function hitPion(pt){ return pions.find(p=>Math.hypot(p.x-pt.x,p.y-pt.y)<PION_R+4); }
+
+canvas.addEventListener('mousedown', onDown); canvas.addEventListener('touchstart',onDown,{passive:false});
+canvas.addEventListener('mousemove', onMove); canvas.addEventListener('touchmove', onMove,{passive:false});
+canvas.addEventListener('mouseup',   onUp);   canvas.addEventListener('touchend',  onUp);
+canvas.addEventListener('wheel', e=>{
+  if(tool==='bg'&&bgImg){
+    e.preventDefault();
+    const pt=ptFromEvent(e);
+    const factor=e.deltaY>0?0.95:1.05;
+    const newScale=bgScale*factor;
+    // Zoom centré sur le curseur : recompute bgX/bgY
+    bgX=pt.x-(pt.x-bgX)*factor;
+    bgY=pt.y-(pt.y-bgY)*factor;
+    // Zoom solidaire : chaque pion pivote autour du même point focal que l'image
+    pions.forEach(p=>{ p.x=pt.x+(p.x-pt.x)*factor; p.y=pt.y+(p.y-pt.y)*factor; });
+    // Resync selected pour que les cercles de zone suivent
+    if(selected) selected=pions.find(p=>p.id===selected.id)??null;
+    bgScale=newScale;
+    PION_R=Math.max(6, BASE_PION_R*bgScale);
+    updateZoneRadii();
+    syncBgUI(); draw();
+    pushState({bg:{data:bgData,x:bgX,y:bgY,scale:bgScale}});
+  }
+},{passive:false});
+
+let drawColor='#e04040', drawWidth=3;
+let fogCursorPt=null; // position souris pour afficher le curseur pinceau fog
+
+canvas.addEventListener('mousemove', e=>{
+  const pt=ptFromEvent(e);
+  fogCursorPt=pt;
+  if(tool==='fog') draw(); // redraw pour afficher/déplacer le cercle curseur
+});
+canvas.addEventListener('mouseleave', ()=>{ fogCursorPt=null; if(tool==='fog') draw(); });
+function onDown(e){
+  if(e.cancelable) e.preventDefault();
+  const pt=ptFromEvent(e);
+  if(tool==='select'){
+    const hit=hitPion(pt);
+    if(hit){
+      // Players can only drag their own pion
+      if(myRole==='player' && hit.id!==myPionId) { selectPion(hit); return; }
+      dragging=hit; dragOffset={x:pt.x-hit.x,y:pt.y-hit.y}; dragOrigin={x:hit.x,y:hit.y}; selectPion(hit); canvas.style.cursor='grabbing';
+    }
+    else { selected=null; renderPionList(); renderDist(); showZoneCard(null); draw(); }
+  } else if(tool==='bg'){
+    if(bgImg){
+      bgDragging=true; bgDragStart={x:pt.x,y:pt.y}; bgPosStart={x:bgX,y:bgY};
+      // Mémoriser position initiale de chaque pion
+      pions.forEach(p=>{ p._ox=p.x; p._oy=p.y; });
+      canvas.style.cursor='grabbing';
+    }
+  } else if(tool==='mesure'){
+    mesureStart=pt; mesureEnd=null; measuring=true; showZoneCard(null);
+  } else if(tool==='draw'){
+    currentStroke={pts:[pt],color:drawColor,width:drawWidth,alpha:.85};
+  } else if(tool==='erase'){
+    eraseAt(pt);
+  } else if(tool==='fog'){
+    fogPainting=true; paintFog(pt); draw();
+  }
+}
+function onMove(e){
+  if(e.cancelable) e.preventDefault();
+  const pt=ptFromEvent(e);
+  if(tool==='select'&&dragging){ dragOrigin={x:pt.x-dragOffset.x,y:pt.y-dragOffset.y}; draw(); }
+  else if(tool==='bg'&&bgDragging){
+    const dx=(pt.x-bgDragStart.x), dy=(pt.y-bgDragStart.y);
+    bgX=bgPosStart.x+dx; bgY=bgPosStart.y+dy;
+    // Déplacer les pions avec l'image
+    pions.forEach(p=>{ p.x=p._ox+dx; p.y=p._oy+dy; });
+    syncBgUI(); draw();
+  }
+  else if(tool==='mesure'&&measuring){ mesureEnd=pt; renderDist(); draw(); }
+  else if(tool==='draw'&&currentStroke){ currentStroke.pts.push(pt); draw(); }
+  else if(tool==='erase'){ eraseAt(pt); }
+  else if(tool==='fog'&&fogPainting){ paintFog(pt); draw(); scheduleFogSync(); }
+}
+function onUp(e){
+  if(tool==='select'&&dragging){
+    const p=pions.find(x=>x.id===dragging.id);
+    if(p){ p.x=dragOrigin.x; p.y=dragOrigin.y; }
+    dragging=null; canvas.style.cursor='default'; renderDist(); draw(); pushState();
+  } else if(tool==='bg'&&bgDragging){
+    bgDragging=false; canvas.style.cursor='grab';
+    pushState({bg:{data:bgData,x:bgX,y:bgY,scale:bgScale}});
+  } else if(tool==='mesure'&&measuring){
+    measuring=false;
+  } else if(tool==='draw'&&currentStroke){
+    if(currentStroke.pts.length>1) drawStrokes.push(currentStroke);
+    currentStroke=null; draw(); pushState();
+  } else if(tool==='fog'&&fogPainting){
+    fogPainting=false; scheduleFogSync();
+  }
+}
+function eraseAt(pt){
+  drawStrokes=drawStrokes.filter(s=>!s.pts.some(p=>Math.hypot(p.x-pt.x,p.y-pt.y)<12));
+  draw(); pushState();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BACKGROUND IMAGE
+// ═══════════════════════════════════════════════════════════════
+function onBgFileChange(){
+  const file=this.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    const img=new Image();
+    img.onload=function(){
+      // Compresser d'abord
+      const MAX=1200;
+      const ratio=Math.min(1, MAX/img.width, MAX/img.height);
+      const tmp=document.createElement('canvas');
+      tmp.width=Math.round(img.width*ratio);
+      tmp.height=Math.round(img.height*ratio);
+      tmp.getContext('2d').drawImage(img,0,0,tmp.width,tmp.height);
+      bgData=tmp.toDataURL('image/jpeg', 0.7);
+      // Charger l'image compressée comme bgImg pour que bgScale soit cohérent
+      const compressed=new Image();
+      compressed.onload=function(){
+        bgImg=compressed;
+        // Calculer bgScale sur les dimensions de l'image compressée
+        bgScale=Math.max(CANVAS_W/compressed.width, CANVAS_H/compressed.height);
+        bgX=(CANVAS_W-compressed.width*bgScale)/2;
+        bgY=(CANVAS_H-compressed.height*bgScale)/2;
+        PION_R=Math.max(6, BASE_PION_R*bgScale);
+        updateZoneRadii();
+        // (Re)créer le fogCanvas aux dimensions de l'image
+        const prevFogData = fogCanvas ? fogCanvas.toDataURL('image/png') : null;
+        initFogCanvas(compressed.width, compressed.height);
+        if(prevFogData){
+          const fi=new Image();
+          fi.onload=()=>{ fogCtx.drawImage(fi,0,0,fogCanvas.width,fogCanvas.height); draw(); };
+          fi.src=prevFogData;
+        }
+        syncBgUI(); draw(); pushState({bg:{data:bgData,x:bgX,y:bgY,scale:bgScale}});
+      };
+      compressed.src=bgData;
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function syncBgUI(){
+  const ctrl=document.getElementById('bg-controls');
+  ctrl.style.display=bgImg?'flex':'none';
+  if(bgImg){
+    document.getElementById('bg-scale-label').textContent=Math.round(bgScale*100)+'%';
+    document.getElementById('bg-scale-range').value=Math.round(bgScale*100);
+  }
+}
+function onBgScale(v){ bgScale=parseFloat(v)/100; PION_R=Math.max(6,BASE_PION_R*bgScale); updateZoneRadii(); document.getElementById('bg-scale-label').textContent=Math.round(bgScale*100)+'%'; draw(); pushState({bg:{data:bgData,x:bgX,y:bgY,scale:bgScale}}); }
+function bgPreset(mode){
+  if(!bgImg) return;
+  if(mode==='cover'){ bgScale=Math.max(CANVAS_W/bgImg.width,CANVAS_H/bgImg.height); }
+  else if(mode==='contain'){ bgScale=Math.min(CANVAS_W/bgImg.width,CANVAS_H/bgImg.height); }
+  else { bgScale=1; }
+  PION_R=Math.max(6,BASE_PION_R*bgScale);
+  updateZoneRadii();
+  bgX=(CANVAS_W-bgImg.width*bgScale)/2; bgY=(CANVAS_H-bgImg.height*bgScale)/2;
+  syncBgUI(); draw(); pushState({bg:{data:bgData,x:bgX,y:bgY,scale:bgScale}});
+}
+function clearBg(){ bgImg=null; bgData=null; bgX=0; bgY=0; bgScale=1; PION_R=BASE_PION_R; updateZoneRadii(); syncBgUI(); draw(); pushState({bg:{data:null,x:0,y:0,scale:1}}); }
+function clearDrawing(){ drawStrokes=[]; currentStroke=null; draw(); pushState(); }
+
+// ═══════════════════════════════════════════════════════════════
+// SCÈNES (locales — sauvegardées sur le PC, pas partagées en réseau)
+// ═══════════════════════════════════════════════════════════════
+function saveScene(){
+  const name=document.getElementById('scene-name').value.trim()||`Scène ${scenes.length+1}`;
+  let snapBgData=null;
+  if(bgImg){
+    const tmp=document.createElement('canvas'); tmp.width=bgImg.width; tmp.height=bgImg.height;
+    tmp.getContext('2d').drawImage(bgImg,0,0);
+    try{snapBgData=tmp.toDataURL('image/webp',.85);}catch(e){snapBgData=tmp.toDataURL('image/png');}
+  }
+  const snap={name,pions:pions.map(p=>({...p,states:[...(p.states||[])]})),strokes:drawStrokes.map(s=>({...s,pts:[...s.pts]})),bgData:snapBgData,bgX,bgY,bgScale,currentTurnIdx,tourNumber};
+  const idx=scenes.findIndex(s=>s.name===name);
+  if(idx>=0) scenes[idx]=snap; else scenes.push(snap);
+  persistScenes(); renderSceneList();
+  document.getElementById('scene-name').value='';
+}
+function loadScene(idx){
+  const s=scenes[idx];
+  pions=s.pions.map(p=>({...p,states:[...(p.states||[])]}));
+  drawStrokes=s.strokes.map(st=>({...st,pts:[...st.pts]}));
+  selected=null; currentTurnIdx=s.currentTurnIdx||0; tourNumber=s.tourNumber||1;
+  bgX=s.bgX||0; bgY=s.bgY||0; bgScale=s.bgScale||1;
+  PION_R=Math.max(6, BASE_PION_R*bgScale);
+  updateZoneRadii();
+  if(s.bgData){
+    const img=new Image(); img.onload=()=>{ bgImg=img; bgData=s.bgData; syncBgUI(); draw(); }; img.src=s.bgData;
+  } else { bgImg=null; bgData=null; syncBgUI(); }
+  renderPionList(); renderInitList(); renderDist(); showZoneCard(null); draw(); pushState({bg:{data:s.bgData||null,x:bgX,y:bgY,scale:bgScale}});
+}
+function deleteScene(idx){ scenes.splice(idx,1); persistScenes(); renderSceneList(); }
+function persistScenes(){ try{localStorage.setItem('myz-scenes',JSON.stringify(scenes));}catch(e){} }
+function renderSceneList(){
+  document.getElementById('scene-list').innerHTML=scenes.map((s,i)=>`
+    <div class="scene-item">
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="loadScene(${i})">${s.name}</span>
+      <button onclick="loadScene(${i})" title="Charger"><i class="ti ti-player-play"></i></button>
+      <button onclick="deleteScene(${i})" title="Supprimer"><i class="ti ti-trash"></i></button>
+    </div>`).join('');
+}
+function initScenes(){
+  try{const r=localStorage.getItem('myz-scenes');if(r)scenes=JSON.parse(r);}catch(e){scenes=[];}
+  renderSceneList();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPLOSIONS
+// ═══════════════════════════════════════════════════════════════
+let blastPower=4;
+const BLAST_ZONES=[
+  {name:"Arm's Length",mult:1},{name:'Near',mult:.7},{name:'Short',mult:.4}
+];
+function changeBlast(d){ blastPower=Math.max(1,Math.min(20,blastPower+d)); document.getElementById('blast-val').textContent=blastPower; renderExplZones(); }
+function renderExplZones(){
+  const shrapnel=document.getElementById('shrapnel-chk')?.checked||false;
+  const bp=blastPower+(shrapnel?2:0); const dmgBonus=shrapnel?1:0;
+  document.getElementById('expl-zones').innerHTML=BLAST_ZONES.map(z=>{
+    const dmg=Math.max(0,Math.round(bp*z.mult))+dmgBonus;
+    return `<div class="expl-zone-row"><span style="color:#8a7f6e">${z.name}</span><span style="color:#e8a030;font-weight:600">${dmg} dégâts</span></div>`;
+  }).join('');
+}
+function rollExplosion(){
+  const shrapnel=document.getElementById('shrapnel-chk')?.checked||false;
+  const bp=blastPower+(shrapnel?2:0); const dmgBonus=shrapnel?1:0;
+  const result=BLAST_ZONES.map(z=>{
+    const base=Math.max(0,Math.round(bp*z.mult));
+    const rolls=Array.from({length:base},()=>Math.ceil(Math.random()*6));
+    const hits=rolls.filter(r=>r>=6).length+dmgBonus;
+    return {zone:z.name,rolls,hits,note:hits===0?'Raté':''};
+  });
+  const res=document.getElementById('expl-result');
+  function diceHtml(rolls){ return rolls.map(r=>`<span class="die-pip" style="${r>=6?'background:#3a1a00;border-color:#e8a030;color:#ffd875':''}">${r}</span>`).join(''); }
+  res.style.display='block';
+  res.innerHTML=result.map(z=>`
+    <div class="expl-res-row" style="background:#1a1008;border-radius:4px;padding:5px 7px;margin-bottom:3px">
+      <span style="color:#8a7f6e;font-size:10px">${z.zone}</span>
+      <span style="color:#e8a030;font-weight:700">${z.hits} dmg ${z.note?`<span style="color:#5a5040;font-weight:400;font-size:9px">${z.note}</span>`:''}</span>
+    </div>
+    <div>${diceHtml(z.rolls)}</div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DICE ROLLER — MYZ
+// ═══════════════════════════════════════════════════════════════
+
+// ── SVG faces ──────────────────────────────────────────────────
+// Symboles : ☢ radiation sur le 6, ☣ biohazard sur le 1 (base+gear)
+const BIOHAZARD_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/>
+<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm0 2c.34 0 .67.03 1 .07A6 6 0 0 0 8.1 9.65a3.5 3.5 0 0 1 2.14-.65H12V8a1 1 0 0 1 2 0v1h1.76a3.5 3.5 0 0 1 2.14.65A6 6 0 0 0 13 4.07C13.33 4.03 13.66 4 14 4Zm-2 8a2 2 0 1 1 4 0 2 2 0 0 1-4 0Zm-1.5 2.6A3.5 3.5 0 0 1 8.5 12c0-.63.17-1.22.46-1.74A6.02 6.02 0 0 0 7 14.27a3.48 3.48 0 0 1 1.5-1.67Zm7 0a3.48 3.48 0 0 1 1.5 1.67A6.02 6.02 0 0 0 15.04 10.26c.29.52.46 1.11.46 1.74a3.5 3.5 0 0 1-.5 1.6ZM12 18a6 6 0 0 0 4.77-2.37 3.5 3.5 0 0 1-2.53.87h-4.48a3.5 3.5 0 0 1-2.53-.87A6 6 0 0 0 12 18Z"/>
+</svg>`;
+
+const RADIATION_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+<path d="M12 11a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/>
+<path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2Zm1 7.07a3 3 0 0 1 1.88 1.26l3.46-2a7.03 7.03 0 0 0-4.34-2.26v4Zm-2 0V6.07A7.03 7.03 0 0 0 6.66 8.33l3.46 2A3 3 0 0 1 11 9.07Zm-1.34 4.2-3.46 2a7.04 7.04 0 0 0 5.8 2.7v-4a3 3 0 0 1-2.34-1.7Zm4.68 0A3 3 0 0 1 12 14.97v4a7.04 7.04 0 0 0 5.8-2.7l-3.46-2Z"/>
+</svg>`;
+
+// Config couleurs par type
+const DICE_CONFIG = {
+  base:  { bg:'#c49a1a', border:'#ffd875', textColor:'#1a1000', shadowColor:'#7a6000', label:'Base'  },
+  skill: { bg:'#1a4a1a', border:'#4fc97a', textColor:'#4fc97a', shadowColor:'#0a2a0a', label:'Skill' },
+  gear:  { bg:'#1a1a1a', border:'#666',    textColor:'#ccc',    shadowColor:'#000',    label:'Gear'  },
+  neg:   { bg:'#2a0808', border:'#e04040', textColor:'#e04040', shadowColor:'#3a0000', label:'Négatif'},
+};
+
+function makeDieSVG(type, value, size=52){
+  const cfg = DICE_CONFIG[type];
+  const isOne = value===1 && (type==='base'||type==='gear');
+  const isSix = value===6;
+
+  // Symboles dessinés directement en SVG path (pas de currentColor)
+  const BIO_PATH = `M${size/2} ${size*0.28}a${size*0.08} ${size*0.08} 0 1 0 0.001 0zM${size*0.32} ${size*0.62}a${size*0.13} ${size*0.13} 0 0 1 ${size*0.05}-${size*0.18}l-${size*0.13}-${size*0.075}a${size*0.22} ${size*0.22} 0 0 0-${size*0.06} ${size*0.255}zM${size*0.68} ${size*0.62}a${size*0.22} ${size*0.22} 0 0 0-${size*0.06}-${size*0.255}l-${size*0.13} ${size*0.075}a${size*0.13} ${size*0.13} 0 0 1 ${size*0.05} ${size*0.18}z`;
+
+  // Icônes texte en unicode intégré dans SVG text
+  const symbol = isOne
+    ? `<text x="${size/2}" y="${size/2+6}" text-anchor="middle" font-family="serif" font-size="${size*0.42}px" fill="${cfg.textColor}">☣</text>`
+    : isSix
+    ? `<text x="${size/2}" y="${size/2+6}" text-anchor="middle" font-family="serif" font-size="${size*0.42}px" fill="${cfg.textColor}">☢</text>`
+    : `<text x="${size/2}" y="${size/2+5}" text-anchor="middle" font-family="'Segoe UI',sans-serif" font-weight="800" font-size="${size*0.38}px" fill="${cfg.textColor}">${value}</text>`;
+
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+    <defs><filter id="ds${type}${value}" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="${cfg.shadowColor}" flood-opacity="0.7"/>
+    </filter></defs>
+    <rect x="2" y="2" width="${size-4}" height="${size-4}" rx="${size*0.17}" ry="${size*0.17}"
+      fill="${cfg.bg}" stroke="${cfg.border}" stroke-width="2.5"
+      filter="url(#ds${type}${value})"/>
+    ${symbol}
+  </svg>`;
+}
+
+// ── State ──────────────────────────────────────────────────────
+let diceCounts = { base:0, skill:0, gear:0, neg:0 };
+let diceCurrentRoll = null;
+let diceOverlayTimer = null;
+const diceHistory = []; // [{roll, timestamp}] — local seulement
+
+function addDiceHistory(roll){
+  // Remplacer l'entrée existante du même jet si c'est un push du même id
+  const idx = diceHistory.findIndex(h=>h.roll.id===roll.id);
+  if(idx>=0) diceHistory[idx] = { roll, timestamp: Date.now() };
+  else diceHistory.unshift({ roll, timestamp: Date.now() });
+  if(diceHistory.length>20) diceHistory.length=20;
+  renderDiceHistory();
+}
+
+function renderDiceHistory(){
+  const el = document.getElementById('dice-history');
+  const titleEl = document.getElementById('dice-hist-title');
+  if(!el) return;
+  if(diceHistory.length===0){ titleEl.style.display='none'; el.innerHTML=''; return; }
+  titleEl.style.display='block';
+  el.innerHTML = diceHistory
+    .filter(({roll})=> !roll.hidden || myRole==='gm' || roll.roller===myName)
+    .map(({roll})=>{
+    const r = calcDiceResults(roll.dice, roll.pushed);
+    const statColor = r.net>0 ? '#4fc97a' : '#e04040';
+    const diceHtml = roll.dice.map(d=>makeDieSVG(d.type,d.value,20)).join('');
+    const traumaHtml = roll.pushed && r.trauma>0
+      ? `<span style="color:#e8a030;font-size:10px"> · ${r.trauma} trauma</span>` : '';
+    const gearHtml = roll.pushed && r.gearDmg>0
+      ? `<span style="color:#888;font-size:10px"> · ${r.gearDmg} équip.</span>` : '';
+    return `<div class="dice-hist-item">
+      <div class="dice-hist-header">
+        <span class="dice-hist-name" style="color:${roll.rollerColor}">${roll.roller}</span>
+        ${roll.pushed?`<span class="dice-hist-pushed">PUSH</span>`:''}
+        ${roll.hidden?`<span style="background:#1a1a2a;color:#60b0ff;border-radius:3px;font-size:9px;padding:1px 4px;font-weight:700">🔒</span>`:''}
+        ${roll.tour?`<span style="color:#5a5040;font-size:9px">T${roll.tour}</span>`:''}
+        <span class="dice-hist-result" style="color:${statColor};margin-left:auto">${r.net} succès${traumaHtml}${gearHtml}</span>
+      </div>
+      <div class="dice-hist-dice">${diceHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Selector UI ───────────────────────────────────────────────
+function diceAdj(type, delta){
+  diceCounts[type] = Math.max(0, Math.min(12, (diceCounts[type]||0) + delta));
+  document.getElementById('dc-'+type).textContent = diceCounts[type];
+}
+
+// ── Roll ──────────────────────────────────────────────────────
+function diceRoll(){
+  const total = Object.values(diceCounts).reduce((a,b)=>a+b,0);
+  if(total===0) return;
+
+  const dice = [];
+  for(const type of ['base','skill','gear','neg']){
+    for(let i=0;i<diceCounts[type];i++){
+      dice.push({ type, value: Math.ceil(Math.random()*6), locked:false });
+    }
+  }
+
+  const hidden = document.getElementById('dice-hidden-chk')?.checked || false;
+  const roll = {
+    roller: myName || 'Inconnu',
+    rollerColor: myColor || '#ffd875',
+    dice,
+    pushed: false,
+    hidden,
+    tour: tourNumber,
+    id: Date.now()
+  };
+  diceCurrentRoll = roll;
+  broadcastDiceRoll(roll);
+  showDiceOverlay(roll, true);
+}
+
+// ── Push ──────────────────────────────────────────────────────
+function dicePushFromOverlay(){
+  if(!diceCurrentRoll || diceCurrentRoll.pushed) return;
+  // Relancer tous les dés qui ne sont ni 6 ni 1 (1 seulement pour base/gear)
+  const newDice = diceCurrentRoll.dice.map(d => {
+    const isBlockedOne = d.value===1 && (d.type==='base'||d.type==='gear');
+    const isSix = d.value===6;
+    if(isBlockedOne || isSix) return { ...d, locked:true };
+    return { ...d, value: Math.ceil(Math.random()*6), locked:false };
+  });
+  const roll = { ...diceCurrentRoll, dice: newDice, pushed: true };
+  diceCurrentRoll = roll;
+  broadcastDiceRoll(roll);
+  showDiceOverlay(roll, true);
+}
+
+// ── Calcul résultats ──────────────────────────────────────────
+function calcDiceResults(dice, pushed){
+  let successes = 0, negSuccesses = 0, trauma = 0, gearDmg = 0;
+  for(const d of dice){
+    if(d.value===6){
+      if(d.type==='neg') negSuccesses++;
+      else successes++;
+    }
+    if(pushed){
+      if(d.value===1 && d.type==='base') trauma++;
+      if(d.value===1 && d.type==='gear') gearDmg++;
+    }
+  }
+  const net = Math.max(0, successes - negSuccesses);
+  return { successes, negSuccesses, net, trauma, gearDmg };
+}
+
+// ── Overlay ───────────────────────────────────────────────────
+function showDiceOverlay(roll, animate){
+  clearTimeout(diceOverlayTimer);
+  const ov = document.getElementById('dice-overlay');
+  const wrap = document.getElementById('ov-dice-wrap');
+  const summary = document.getElementById('ov-summary');
+  const pushBtn = document.getElementById('ov-push-btn');
+  const pushBadge = document.getElementById('ov-push-badge');
+
+  document.getElementById('ov-who').textContent = roll.roller;
+  document.getElementById('ov-who').style.color = roll.rollerColor || '#ffd875';
+
+  // Dés
+  wrap.innerHTML = roll.dice.map((d,i) =>
+    `<div class="ov-die${d.locked?' locked-one':''}" id="ovd-${i}" style="animation-delay:${i*40}ms">
+      ${makeDieSVG(d.type, d.value, 52)}
+    </div>`
+  ).join('');
+
+  if(animate){
+    wrap.querySelectorAll('.ov-die:not(.locked-one)').forEach(el=>{
+      el.classList.add('rolling');
+      el.addEventListener('animationend',()=>el.classList.remove('rolling'),{once:true});
+    });
+  }
+
+  // Résultats
+  const r = calcDiceResults(roll.dice, roll.pushed);
+  const statColor = r.net>0 ? '#4fc97a' : '#e04040';
+  summary.innerHTML = `
+    <div class="ov-stat"><span class="ov-stat-val" style="color:${statColor}">${r.net}</span><span class="ov-stat-label">SUCCÈS</span></div>
+    ${r.negSuccesses>0?`<div class="ov-stat"><span class="ov-stat-val" style="color:#e04040">-${r.negSuccesses}</span><span class="ov-stat-label">NÉGATIFS</span></div>`:''}
+    ${roll.pushed&&r.trauma>0?`<div class="ov-stat"><span class="ov-stat-val" style="color:#e8a030">${r.trauma}</span><span class="ov-stat-label">TRAUMA</span></div>`:''}
+    ${roll.pushed&&r.gearDmg>0?`<div class="ov-stat"><span class="ov-stat-val" style="color:#888">${r.gearDmg}</span><span class="ov-stat-label">ÉQUIP. ENDOMMAGÉ</span></div>`:''}
+  `;
+
+  // Push visible seulement pour le lanceur, si pas encore pushé, et si des dés relançables existent
+  const canPush = !roll.pushed && roll.roller===myName && roll.dice.some(d=>{
+    const blocked = (d.value===1&&(d.type==='base'||d.type==='gear')) || d.value===6;
+    return !blocked;
+  });
+  pushBtn.style.display = canPush ? 'block' : 'none';
+  pushBadge.style.display = roll.pushed ? 'block' : 'none';
+  const hiddenBadge = document.getElementById('ov-hidden-badge');
+  if(hiddenBadge) hiddenBadge.style.display = roll.hidden ? 'block' : 'none';
+
+  ov.style.display = 'flex';
+  ov.style.opacity = '1';
+
+  // Ajouter à l'historique local
+  addDiceHistory(roll);
+
+  // Fermeture auto seulement pour les autres (pas le lanceur)
+  const isRoller = roll.roller === myName;
+  if(!isRoller){
+    diceOverlayTimer = setTimeout(()=>{
+      ov.style.transition='opacity .6s';
+      ov.style.opacity='0';
+      setTimeout(()=>{ ov.style.display='none'; ov.style.transition=''; ov.style.opacity='1'; }, 600);
+    }, 8000);
+  }
+}
+
+function closeDiceOverlay(){
+  clearTimeout(diceOverlayTimer);
+  const ov = document.getElementById('dice-overlay');
+  ov.style.transition='opacity .4s';
+  ov.style.opacity='0';
+  setTimeout(()=>{ ov.style.display='none'; ov.style.transition=''; ov.style.opacity='1'; }, 400);
+}
+
+// ── Sync Liveblocks ──────────────────────────────────────────
+function broadcastDiceRoll(roll){
+  if(!lbRoot) return;
+  ignoreRemote=true;
+  lbRoot.set('lastDiceRoll', JSON.stringify(roll));
+  setTimeout(()=>{ ignoreRemote=false; }, 200);
+}
+
+function applyRemoteDiceRoll(raw){
+  if(!raw) return;
+  try{
+    const roll = JSON.parse(raw);
+    // Ne pas réafficher son propre roll initial (déjà affiché localement)
+    if(roll.roller===myName && !roll.pushed && roll.id===diceCurrentRoll?.id) return;
+    // Jet caché : visible seulement par le lanceur et le MJ
+    if(roll.hidden && myRole!=='gm' && roll.roller!==myName) return;
+    showDiceOverlay(roll, true);
+  }catch(e){}
+}
+
+
+setTimeout(()=>renderExplZones(), 50);
+setTimeout(resize, 50);
+
+// Expose functions to window (required for onclick= handlers with ES modules)
+Object.assign(window, {
+  createRoom, joinRoom,
+  setTool, pickColor,
+  addPion, removePion, selectPion,
+  setInitiative, adjustInit, rollInit, nextTurn, prevTurn, resetTurn,
+  setZoneScale, setZoneOpacity, showZoneCard,
+  onBgScale, bgPreset, clearBg, clearDrawing,
+  saveScene, loadScene, deleteScene,
+  copyRoomCode,
+  changeBlast, renderExplZones, rollExplosion,
+  fillFog, clearFog, onFogOpacity, onFogBrush, setFogMode,
+  diceAdj, diceRoll, dicePushFromOverlay, closeDiceOverlay, renderDiceHistory,
+});
+</script>
+</body>
+</html>
